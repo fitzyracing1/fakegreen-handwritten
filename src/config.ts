@@ -1,7 +1,7 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { globToRegExp } from './glob';
-import { Severity } from './types';
+import { type Severity } from './types';
 
 export type RuleSetting = 'off' | Severity;
 
@@ -33,15 +33,24 @@ export function loadConfig(root: string, explicit?: string): ResolvedConfig {
   } else {
     for (const name of CONFIG_FILES) {
       const p = path.join(root, name);
-      if (fs.existsSync(p)) { source = p; raw = parseJson(p); break; }
+      if (fs.existsSync(p)) {
+        source = p;
+        raw = parseJson(p);
+        break;
+      }
     }
     if (!source) {
       const pkg = path.join(root, 'package.json');
       if (fs.existsSync(pkg)) {
         try {
           const j = JSON.parse(fs.readFileSync(pkg, 'utf8'));
-          if (j && typeof j.fakegreen === 'object') { raw = j.fakegreen; source = pkg + '#fakegreen'; }
-        } catch { /* ignore malformed package.json */ }
+          if (j && typeof j.fakegreen === 'object') {
+            raw = j.fakegreen;
+            source = pkg + '#fakegreen';
+          }
+        } catch {
+          /* ignore malformed package.json */
+        }
       }
     }
   }
@@ -54,11 +63,13 @@ export function resolveConfig(raw: UserConfig, source: string | null = null): Re
   for (const [k, v] of Object.entries(raw.rules ?? {})) {
     const val = (typeof v === 'boolean' ? (v ? undefined : 'off') : v) as RuleSetting | undefined;
     if (val === undefined) continue;
-    if (!valid.includes(val)) throw new ConfigError(`Invalid setting for rule "${k}": ${JSON.stringify(v)} (expected off|low|medium|high)`);
+    if (!valid.includes(val))
+      throw new ConfigError(`Invalid setting for rule "${k}": ${JSON.stringify(v)} (expected off|low|medium|high)`);
     rules[k] = val;
   }
   const failOn = raw.failOn ?? 'high';
-  if (!['low', 'medium', 'high', 'none'].includes(failOn)) throw new ConfigError(`Invalid failOn: ${JSON.stringify(failOn)}`);
+  if (!['low', 'medium', 'high', 'none'].includes(failOn))
+    throw new ConfigError(`Invalid failOn: ${JSON.stringify(failOn)}`);
   return {
     rules,
     ignore: (raw.ignore ?? []).map(globToRegExp),

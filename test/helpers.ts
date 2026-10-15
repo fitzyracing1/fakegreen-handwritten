@@ -1,12 +1,12 @@
-import { execFileSync } from 'child_process';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import { execFileSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { analyzeDiffs } from '../src/analyze';
-import { resolveConfig, UserConfig } from '../src/config';
+import { resolveConfig, type UserConfig } from '../src/config';
 import { parseDiff } from '../src/diff';
 import { getDiff } from '../src/git';
-import { Finding } from '../src/types';
+import { type Finding } from '../src/types';
 
 export function sh(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -27,7 +27,10 @@ export function tmpRepo(files: Record<string, string> = {}): string {
 export function writeFiles(dir: string, files: Record<string, string | null>) {
   for (const [rel, content] of Object.entries(files)) {
     const abs = path.join(dir, rel);
-    if (content === null) { fs.rmSync(abs, { force: true }); continue; }
+    if (content === null) {
+      fs.rmSync(abs, { force: true });
+      continue;
+    }
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, content);
   }
@@ -42,7 +45,11 @@ export interface ChangeOpts {
 }
 
 /** Commit `before`, apply `after` (null deletes), and scan the working tree. */
-export function scanChange(before: Record<string, string>, after: Record<string, string | null>, opts: ChangeOpts = {}): Finding[] {
+export function scanChange(
+  before: Record<string, string>,
+  after: Record<string, string | null>,
+  opts: ChangeOpts = {},
+): Finding[] {
   const dir = tmpRepo(before);
   try {
     for (const [from, to] of opts.moves ?? []) {

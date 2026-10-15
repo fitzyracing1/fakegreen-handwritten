@@ -1,9 +1,9 @@
-import { execFileSync } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
+import { execFileSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { addedFileDiff } from './diff';
 import { fileKind } from './lang';
-import { FileDiff } from './types';
+import { type FileDiff } from './types';
 
 export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
@@ -11,7 +11,12 @@ export class GitError extends Error {}
 
 export function git(args: string[], cwd: string): string {
   try {
-    return execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    return execFileSync('git', args, {
+      cwd,
+      encoding: 'utf8',
+      maxBuffer: 512 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
   } catch (e) {
     const err = e as { stderr?: string; message: string };
     throw new GitError((err.stderr || err.message).toString().trim());
@@ -19,7 +24,11 @@ export function git(args: string[], cwd: string): string {
 }
 
 function tryGit(args: string[], cwd: string): string | null {
-  try { return git(args, cwd).trim(); } catch { return null; }
+  try {
+    return git(args, cwd).trim();
+  } catch {
+    return null;
+  }
 }
 
 export function repoRoot(cwd: string): string {
@@ -41,13 +50,28 @@ export interface DiffSource {
   description: string;
 }
 
-const DIFF_FLAGS = ['-c', 'core.quotepath=off', 'diff', '--no-color', '--no-ext-diff', '--no-textconv', '--src-prefix=a/', '--dst-prefix=b/', '-M', '-U3'];
+const DIFF_FLAGS = [
+  '-c',
+  'core.quotepath=off',
+  'diff',
+  '--no-color',
+  '--no-ext-diff',
+  '--no-textconv',
+  '--src-prefix=a/',
+  '--dst-prefix=b/',
+  '-M',
+  '-U3',
+];
 
 function hasRef(ref: string, cwd: string): boolean {
   return tryGit(['rev-parse', '--verify', '-q', ref + '^{commit}'], cwd) !== null;
 }
 
-export function getDiff(mode: DiffMode, cwd: string, opts: { untracked?: boolean; maxFileBytes?: number } = {}): DiffSource {
+export function getDiff(
+  mode: DiffMode,
+  cwd: string,
+  opts: { untracked?: boolean; maxFileBytes?: number } = {},
+): DiffSource {
   const root = repoRoot(cwd);
   const head = hasRef('HEAD', root);
   const run = (...args: string[]) => git([...DIFF_FLAGS, ...args], root);
@@ -84,7 +108,8 @@ export function getDiff(mode: DiffMode, cwd: string, opts: { untracked?: boolean
       break;
     }
   }
-  const untracked = includeUntracked && opts.untracked !== false ? untrackedFiles(root, opts.maxFileBytes ?? 1024 * 1024) : [];
+  const untracked =
+    includeUntracked && opts.untracked !== false ? untrackedFiles(root, opts.maxFileBytes ?? 1024 * 1024) : [];
   if (untracked.length) description += ` + ${untracked.length} untracked file${untracked.length === 1 ? '' : 's'}`;
   return { text, untracked, description };
 }
@@ -93,7 +118,10 @@ function untrackedFiles(root: string, maxBytes: number): FileDiff[] {
   const out = git(['-c', 'core.quotepath=off', 'ls-files', '--others', '--exclude-standard', '-z'], root);
   const files: FileDiff[] = [];
   // Only read files fakegreen would analyse; skip vendored/binary/doc paths up front.
-  const rels = out.split('\0').filter((r) => r && fileKind(r) !== 'skip').slice(0, 5000);
+  const rels = out
+    .split('\0')
+    .filter((r) => r && fileKind(r) !== 'skip')
+    .slice(0, 5000);
   for (const rel of rels) {
     const abs = path.join(root, rel);
     try {
@@ -102,7 +130,9 @@ function untrackedFiles(root: string, maxBytes: number): FileDiff[] {
       const buf = fs.readFileSync(abs);
       if (buf.subarray(0, 8000).includes(0)) continue; // binary
       files.push(addedFileDiff(rel, buf.toString('utf8')));
-    } catch { /* vanished */ }
+    } catch {
+      /* vanished */
+    }
   }
   return files;
 }

@@ -23,8 +23,14 @@ test('tracks old/new line numbers through a hunk', () => {
   const [app] = parseDiff(fixture('mixed.diff'));
   const added = app.hunks[0].lines.filter((l) => l.kind === '+');
   const removed = app.hunks[0].lines.filter((l) => l.kind === '-');
-  assert.deepEqual(added.map((l) => l.newNo), [11]);
-  assert.deepEqual(removed.map((l) => l.oldNo), [11]);
+  assert.deepEqual(
+    added.map((l) => l.newNo),
+    [11],
+  );
+  assert.deepEqual(
+    removed.map((l) => l.oldNo),
+    [11],
+  );
   assert.equal(added[0].text, '  return computeTotal(items) ?? 0;');
 });
 

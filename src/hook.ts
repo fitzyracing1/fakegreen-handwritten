@@ -1,12 +1,12 @@
-import * as crypto from 'crypto';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { analyzeDiffs, meetsThreshold } from './analyze';
 import { loadConfig } from './config';
 import { parseDiff } from './diff';
-import { DiffMode, getDiff, repoRoot } from './git';
-import { Finding, SEVERITY_RANK, Severity } from './types';
+import { type DiffMode, getDiff, repoRoot } from './git';
+import { type Finding, SEVERITY_RANK, type Severity } from './types';
 
 export type Agent = 'claude' | 'codex' | 'gemini';
 
@@ -45,7 +45,9 @@ export function formatReason(findings: Finding[], failOn: Severity): string {
     '',
   ];
   for (const f of blocking.slice(0, 25)) {
-    lines.push(`- [${f.severity}] ${f.ruleId} at ${f.file}${f.line !== undefined ? ':' + f.line : ''}: ${f.message}${f.snippet ? `  \`${f.snippet.split('\n').pop()!.slice(2, 122)}\`` : ''}`);
+    lines.push(
+      `- [${f.severity}] ${f.ruleId} at ${f.file}${f.line !== undefined ? ':' + f.line : ''}: ${f.message}${f.snippet ? `  \`${f.snippet.split('\n').pop()!.slice(2, 122)}\`` : ''}`,
+    );
   }
   if (blocking.length > 25) lines.push(`- ...and ${blocking.length - 25} more (run \`npx fakegreen\` to see all)`);
   lines.push(
@@ -62,7 +64,15 @@ function stateFile(sessionKey: string): string {
 }
 
 function fingerprint(findings: Finding[]): string {
-  return crypto.createHash('sha1').update(findings.map((f) => `${f.ruleId}|${f.file}|${f.snippet ?? f.message}`).sort().join('\n')).digest('hex');
+  return crypto
+    .createHash('sha1')
+    .update(
+      findings
+        .map((f) => `${f.ruleId}|${f.file}|${f.snippet ?? f.message}`)
+        .sort()
+        .join('\n'),
+    )
+    .digest('hex');
 }
 
 export interface HookOptions {
@@ -73,8 +83,12 @@ export interface HookOptions {
 }
 
 export function runHook(rawInput: string, opts: HookOptions = {}): HookOutcome {
-  let input: HookInput = {};
-  try { input = rawInput.trim() ? JSON.parse(rawInput) : {}; } catch { input = {}; }
+  let input: HookInput;
+  try {
+    input = rawInput.trim() ? JSON.parse(rawInput) : {};
+  } catch {
+    input = {};
+  }
   const agent = detectAgent(input, opts.agent);
   const cwd = typeof input.cwd === 'string' && input.cwd ? input.cwd : process.cwd();
   const allow: HookOutcome = { stdout: '', exitCode: 0, findings: [] };
@@ -104,23 +118,39 @@ export function runHook(rawInput: string, opts: HookOptions = {}): HookOutcome {
     const fp = fingerprint(findings);
     const sf = stateFile(key);
     let previous: string | null = null;
-    try { previous = JSON.parse(fs.readFileSync(sf, 'utf8')).fingerprint; } catch { /* none */ }
+    try {
+      previous = JSON.parse(fs.readFileSync(sf, 'utf8')).fingerprint;
+    } catch {
+      /* none */
+    }
     const n = findings.filter((f) => SEVERITY_RANK[f.severity] >= SEVERITY_RANK[failOn]).length;
     if (input.stop_hook_active && previous === fp) {
       const msg = `fakegreen: ${n} unresolved fake-green finding${n === 1 ? '' : 's'} remain after the agent was asked to fix them. Run \`npx fakegreen\` to review before trusting this turn.`;
       return { stdout: JSON.stringify({ systemMessage: msg }), exitCode: 0, findings };
     }
-    try { fs.writeFileSync(sf, JSON.stringify({ fingerprint: fp, at: Date.now() })); } catch { /* best effort */ }
+    try {
+      fs.writeFileSync(sf, JSON.stringify({ fingerprint: fp, at: Date.now() }));
+    } catch {
+      /* best effort */
+    }
     const reason = formatReason(findings, failOn);
     return { stdout: JSON.stringify(blockResponse(agent, reason)), exitCode: 0, findings };
   } catch (e) {
     // Never break the agent because of a fakegreen error: fail open, but tell the user.
-    return { stdout: JSON.stringify({ systemMessage: `fakegreen hook error: ${(e as Error).message}` }), exitCode: 0, findings: [] };
+    return {
+      stdout: JSON.stringify({ systemMessage: `fakegreen hook error: ${(e as Error).message}` }),
+      exitCode: 0,
+      findings: [],
+    };
   }
 }
 
 function clearState(input: HookInput, root: string) {
   for (const a of ['claude', 'codex', 'gemini']) {
-    try { fs.unlinkSync(stateFile(`${a}:${input.session_id ?? ''}:${root}`)); } catch { /* none */ }
+    try {
+      fs.unlinkSync(stateFile(`${a}:${input.session_id ?? ''}:${root}`));
+    } catch {
+      /* none */
+    }
   }
 }
