@@ -46,6 +46,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
+      # same check through the shared Action, so this repo stays in step with uniform
+      - uses: fitzyracing1/uniform@v1
 
   dogfood:
     name: fakegreen on its own PR diff

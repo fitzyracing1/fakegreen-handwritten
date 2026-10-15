@@ -38,13 +38,13 @@ export function writeFiles(dir: string, files: Record<string, string | null>) {
 
 export interface ChangeOpts {
   config?: UserConfig;
-  /** git add -A before diffing (enables rename detection). */
+  // git add -A first so git can detect renames
   stage?: boolean;
-  /** Rename files with git mv before applying `after`: [from, to][] */
+  // [from, to] pairs, git mv'd before `after` is applied
   moves?: [string, string][];
 }
 
-/** Commit `before`, apply `after` (null deletes), and scan the working tree. */
+// commit `before`, apply `after` (null deletes the file), then scan the working tree
 export function scanChange(
   before: Record<string, string>,
   after: Record<string, string | null>,
@@ -65,12 +65,10 @@ export function scanChange(
   }
 }
 
-/** Convenience: single file modified from `a` to `b`. */
 export function scanEdit(file: string, a: string, b: string, opts: ChangeOpts = {}): Finding[] {
   return scanChange({ [file]: a }, { [file]: b }, opts);
 }
 
-/** Scan a raw unified diff string. */
 export function scanDiff(diff: string, config: UserConfig = {}): Finding[] {
   return analyzeDiffs(parseDiff(diff), resolveConfig(config)).findings;
 }

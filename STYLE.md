@@ -1,6 +1,6 @@
 # How I write code here
 
-I want this code to read like a person wrote it, without dropping any of the care. These are the rules I hold
+This repo follows [uniform](https://github.com/fitzyracing1/uniform). I want this code to read like a person wrote it, without dropping any of the care. These are the rules I hold
 myself to. The ones a machine can check are enforced by ESLint and Prettier (`npm run lint`, `npm run format:check`),
 and CI goes dark when they drift.
 
