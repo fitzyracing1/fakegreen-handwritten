@@ -1,5 +1,5 @@
-import { Hit, ChangedFile, isMovedLine, squashSpaces, Scan } from '../context';
-import { DiffLine, Hunk } from '../types';
+import { type Hit, type ChangedFile, isMovedLine, squashSpaces, type Scan } from '../context';
+import { type DiffLine, type Hunk } from '../types';
 import { ASSERT, INLINE_TEST_LANGS, STRONG, TRIVIAL, WEAK } from './patterns';
 import { declStats } from './tests';
 
@@ -26,19 +26,53 @@ export function assertionsRemoved(scan: Scan, flag: Emit) {
     const movedOut = removed.filter((l) => !addedHere.has(squashSpaces(l.text)) && isMovedLine(scan, l)).length;
     const lost = removed.length - added.length - movedOut;
     if (lost <= 0) continue;
-    const commented = removed.filter((r) => f.added.some((a) => a.comment && a.comment.includes(squashSpaces(r.text).slice(0, 40)))).length;
+    const commented = removed.filter((r) =>
+      f.added.some((a) => a.comment && a.comment.includes(squashSpaces(r.text).slice(0, 40))),
+    ).length;
     const first = removed.find((l) => !isMovedLine(scan, l)) ?? removed[0];
     let message = `Net assertions dropped by ${lost} (${removed.length} removed, ${added.length} added)`;
     if (commented) message += `; ${commented} commented out`;
     flag({
       ruleId: 'assertion-removed',
       severity: lost >= 3 || commented > 0 ? 'high' : 'medium',
-      file: f, line: first, side: 'removed', message, snippet: first.text.trim(),
+      file: f,
+      line: first,
+      side: 'removed',
+      message,
+      snippet: first.text.trim(),
     });
   }
 }
 
-const STOP = new Set(['expect', 'assert', 'self', 'require', 'not', 'to', 'be', 'is', 'in', 'and', 'or', 'await', 'async', 'function', 'return', 'true', 'false', 'True', 'False', 'None', 'null', 'undefined', 'nil', 'new', 'this', 'it', 'ok']);
+const STOP = new Set([
+  'expect',
+  'assert',
+  'self',
+  'require',
+  'not',
+  'to',
+  'be',
+  'is',
+  'in',
+  'and',
+  'or',
+  'await',
+  'async',
+  'function',
+  'return',
+  'true',
+  'false',
+  'True',
+  'False',
+  'None',
+  'null',
+  'undefined',
+  'nil',
+  'new',
+  'this',
+  'it',
+  'ok',
+]);
 
 // Identifier tokens that describe what an assertion is about (minus assertion vocabulary).
 function subjectTokens(l: DiffLine): Set<string> {
@@ -63,7 +97,11 @@ function changeBlocks(h: Hunk): Map<DiffLine, number> {
   let block = 0;
   let inBlock = false;
   for (const l of h.lines) {
-    if (l.kind === ' ') { if (inBlock) block++; inBlock = false; continue; }
+    if (l.kind === ' ') {
+      if (inBlock) block++;
+      inBlock = false;
+      continue;
+    }
     inBlock = true;
     m.set(l, block);
   }
@@ -89,7 +127,8 @@ function matchesAnyPat(code: string, pats: { re: RegExp }[] | undefined): boolea
   return !!pats?.some((p) => p.re.test(code));
 }
 
-const LITERAL = /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|\b\d+(?:\.\d+)?\b|\b(?:true|false|True|False|None|null|undefined|nil)\b/g;
+const LITERAL =
+  /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|\b\d+(?:\.\d+)?\b|\b(?:true|false|True|False|None|null|undefined|nil)\b/g;
 
 export function normalizeLiterals(s: string): string {
   return s.replace(LITERAL, 'L').replace(/\s+/g, '');
@@ -102,12 +141,22 @@ export function assertionChanges(scan: Scan, flag: Emit) {
     // Trivially-true assertions anywhere in added test code.
     for (const l of f.added) {
       if (isMovedLine(scan, l)) continue;
-      if ((TRIVIAL[f.lang] ?? []).some((r) => {
-        // Match on code WITH strings (to compare literals), but the call itself must not sit inside a string.
-        const m = new RegExp(r.source, r.flags.replace('g', '')).exec(l.codeStr);
-        return !!m && l.code.slice(m.index, m.index + 3) === l.codeStr.slice(m.index, m.index + 3);
-      })) {
-        flag({ ruleId: 'assertion-trivial', severity: 'high', file: f, line: l, side: 'added', message: 'Assertion can never fail', snippet: l.text.trim() });
+      if (
+        (TRIVIAL[f.lang] ?? []).some((r) => {
+          // Match on code WITH strings (to compare literals), but the call itself must not sit inside a string.
+          const m = new RegExp(r.source, r.flags.replace('g', '')).exec(l.codeStr);
+          return !!m && l.code.slice(m.index, m.index + 3) === l.codeStr.slice(m.index, m.index + 3);
+        })
+      ) {
+        flag({
+          ruleId: 'assertion-trivial',
+          severity: 'high',
+          file: f,
+          line: l,
+          side: 'added',
+          message: 'Assertion can never fail',
+          snippet: l.text.trim(),
+        });
       }
     }
   }
@@ -133,7 +182,11 @@ function analyseHunk(scan: Scan, f: ChangedFile, h: Hunk, flag: Emit) {
     used.add(r);
     if (equivalent(r, w)) continue;
     flag({
-      ruleId: 'assertion-weakened', severity: 'high', file: f, line: w, side: 'added',
+      ruleId: 'assertion-weakened',
+      severity: 'high',
+      file: f,
+      line: w,
+      side: 'added',
       message: 'Specific assertion replaced with a vague one',
       snippet: `- ${r.text.trim()}\n+ ${w.text.trim()}`,
     });
@@ -142,12 +195,19 @@ function analyseHunk(scan: Scan, f: ChangedFile, h: Hunk, flag: Emit) {
   for (const r of removed) {
     if (used.has(r)) continue;
     const key = normalizeLiterals(r.codeStr);
-    const a = added.find((x) => !used.has(x) && normalizeLiterals(x.codeStr) === key && squashSpaces(x.codeStr) !== squashSpaces(r.codeStr));
+    const a = added.find(
+      (x) =>
+        !used.has(x) && normalizeLiterals(x.codeStr) === key && squashSpaces(x.codeStr) !== squashSpaces(r.codeStr),
+    );
     if (!a) continue;
     used.add(a);
     used.add(r);
     flag({
-      ruleId: 'assertion-expected-changed', severity: 'low', file: f, line: a, side: 'added',
+      ruleId: 'assertion-expected-changed',
+      severity: 'low',
+      file: f,
+      line: a,
+      side: 'added',
       message: 'Expected value in assertion changed; make sure the code (not the test) was wrong',
       snippet: `- ${r.text.trim()}\n+ ${a.text.trim()}`,
     });

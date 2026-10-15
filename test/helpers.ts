@@ -1,12 +1,12 @@
-import { execFileSync } from 'child_process';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import { execFileSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { analyzeDiffs } from '../src/analyze';
-import { resolveConfig, UserConfig } from '../src/config';
+import { resolveConfig, type UserConfig } from '../src/config';
 import { parseDiff } from '../src/diff';
 import { getDiff } from '../src/git';
-import { Finding } from '../src/types';
+import { type Finding } from '../src/types';
 
 export function sh(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -27,7 +27,10 @@ export function tmpRepo(files: Record<string, string> = {}): string {
 export function writeFiles(dir: string, files: Record<string, string | null>) {
   for (const [rel, content] of Object.entries(files)) {
     const abs = path.join(dir, rel);
-    if (content === null) { fs.rmSync(abs, { force: true }); continue; }
+    if (content === null) {
+      fs.rmSync(abs, { force: true });
+      continue;
+    }
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, content);
   }
@@ -35,14 +38,18 @@ export function writeFiles(dir: string, files: Record<string, string | null>) {
 
 export interface ChangeOpts {
   config?: UserConfig;
-  /** git add -A before diffing (enables rename detection). */
+  // git add -A first so git can detect renames
   stage?: boolean;
-  /** Rename files with git mv before applying `after`: [from, to][] */
+  // [from, to] pairs, git mv'd before `after` is applied
   moves?: [string, string][];
 }
 
-/** Commit `before`, apply `after` (null deletes), and scan the working tree. */
-export function scanChange(before: Record<string, string>, after: Record<string, string | null>, opts: ChangeOpts = {}): Finding[] {
+// commit `before`, apply `after` (null deletes the file), then scan the working tree
+export function scanChange(
+  before: Record<string, string>,
+  after: Record<string, string | null>,
+  opts: ChangeOpts = {},
+): Finding[] {
   const dir = tmpRepo(before);
   try {
     for (const [from, to] of opts.moves ?? []) {
@@ -58,12 +65,10 @@ export function scanChange(before: Record<string, string>, after: Record<string,
   }
 }
 
-/** Convenience: single file modified from `a` to `b`. */
 export function scanEdit(file: string, a: string, b: string, opts: ChangeOpts = {}): Finding[] {
   return scanChange({ [file]: a }, { [file]: b }, opts);
 }
 
-/** Scan a raw unified diff string. */
 export function scanDiff(diff: string, config: UserConfig = {}): Finding[] {
   return analyzeDiffs(parseDiff(diff), resolveConfig(config)).findings;
 }

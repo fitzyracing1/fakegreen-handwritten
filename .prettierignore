@@ -1,0 +1,8 @@
+dist/
+build-test/
+node_modules/
+docs/
+package-lock.json
+*.md
+test/fixtures/
+skills/

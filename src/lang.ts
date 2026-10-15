@@ -1,11 +1,25 @@
-import { FileKind, Lang } from './types';
+import { type FileKind, type Lang } from './types';
 
 const EXT_LANG: Record<string, Lang> = {
-  js: 'js', jsx: 'js', mjs: 'js', cjs: 'js', ts: 'js', tsx: 'js', mts: 'js', cts: 'js', vue: 'js', svelte: 'js',
-  py: 'py', pyi: 'py',
+  js: 'js',
+  jsx: 'js',
+  mjs: 'js',
+  cjs: 'js',
+  ts: 'js',
+  tsx: 'js',
+  mts: 'js',
+  cts: 'js',
+  vue: 'js',
+  svelte: 'js',
+  py: 'py',
+  pyi: 'py',
   go: 'go',
   rs: 'rust',
-  java: 'java', kt: 'java', kts: 'java', scala: 'java', groovy: 'java',
+  java: 'java',
+  kt: 'java',
+  kts: 'java',
+  scala: 'java',
+  groovy: 'java',
 };
 
 export function langOf(path: string): Lang {
@@ -100,7 +114,9 @@ export function isTestPath(path: string, extra: RegExp[] = []): boolean {
 
 // Language-independent classification of a path as "test support" (conftest, setup files).
 export function isTestSupportPath(path: string): boolean {
-  return /(^|\/)(conftest\.py|setupTests\.[jt]s|jest\.setup\.[jt]s|vitest\.setup\.[jt]s|test[-_]?helpers?\.[a-z]+|testutil[s]?\.[a-z]+)$/.test(path);
+  return /(^|\/)(conftest\.py|setupTests\.[jt]s|jest\.setup\.[jt]s|vitest\.setup\.[jt]s|test[-_]?helpers?\.[a-z]+|testutil[s]?\.[a-z]+)$/.test(
+    path,
+  );
 }
 
 // The lexer. Splits each line into code and comment, and blanks out string
@@ -145,7 +161,10 @@ export function lexLine(text: string, lang: Lang, flavor: Flavor, st: LexState):
   while (i < n) {
     if (st.block) {
       const end = text.indexOf('*/', i);
-      if (end < 0) { comment += text.slice(i); i = n; break; }
+      if (end < 0) {
+        comment += text.slice(i);
+        break;
+      }
       comment += text.slice(i, end);
       i = end + 2;
       st.block = false;
@@ -156,8 +175,14 @@ export function lexLine(text: string, lang: Lang, flavor: Flavor, st: LexState):
       let j = i;
       let closed = false;
       while (j < n) {
-        if (text[j] === '\\' && close !== '`raw') { j += 2; continue; }
-        if (text.startsWith(close === '`raw' ? '`' : close, j)) { closed = true; break; }
+        if (text[j] === '\\' && close !== '`raw') {
+          j += 2;
+          continue;
+        }
+        if (text.startsWith(close === '`raw' ? '`' : close, j)) {
+          closed = true;
+          break;
+        }
         j++;
       }
       const delim = close === '`raw' ? '`' : close;
@@ -177,10 +202,18 @@ export function lexLine(text: string, lang: Lang, flavor: Flavor, st: LexState):
     const c = text[i];
     const rest2 = text.substr(i, 2);
     if (flavor === 'c') {
-      if (rest2 === '//') { comment += text.slice(i + 2); break; }
-      if (rest2 === '/*') { st.block = true; i += 2; continue; }
+      if (rest2 === '//') {
+        comment += text.slice(i + 2);
+        break;
+      }
+      if (rest2 === '/*') {
+        st.block = true;
+        i += 2;
+        continue;
+      }
       if (c === '"' || c === '`' || (c === "'" && isCharOrStringQuote(text, i, lang))) {
-        code += c; codeStr += c;
+        code += c;
+        codeStr += c;
         st.str = c === '`' && lang === 'go' ? '`raw' : c;
         i++;
         continue;
@@ -198,18 +231,23 @@ export function lexLine(text: string, lang: Lang, flavor: Flavor, st: LexState):
       }
       if (lang === 'rust' && c === 'r' && /^r#*"/.test(text.slice(i)) && !/[A-Za-z0-9_]/.test(text[i - 1] ?? '')) {
         const m = /^r(#*)"/.exec(text.slice(i))!;
-        code += m[0]; codeStr += m[0];
+        code += m[0];
+        codeStr += m[0];
         st.str = '"' + m[1];
         i += m[0].length;
         continue;
       }
     } else {
       // python
-      if (c === '#') { comment += text.slice(i + 1); break; }
+      if (c === '#') {
+        comment += text.slice(i + 1);
+        break;
+      }
       if (c === '"' || c === "'") {
         const triple = text.substr(i, 3) === c.repeat(3);
         const delim = triple ? c.repeat(3) : c;
-        code += delim; codeStr += delim;
+        code += delim;
+        codeStr += delim;
         st.str = delim;
         i += delim.length;
         continue;
@@ -237,7 +275,10 @@ function regexEnd(text: string, i: number): number {
   let inClass = false;
   for (let j = i + 1; j < text.length; j++) {
     const ch = text[j];
-    if (ch === '\\') { j++; continue; }
+    if (ch === '\\') {
+      j++;
+      continue;
+    }
     if (ch === '[') inClass = true;
     else if (ch === ']') inClass = false;
     else if (ch === '/' && !inClass) return j === i + 1 ? -1 : j;
@@ -277,9 +318,11 @@ export function findDirective(comment: string): { file: boolean; rest: string } 
   let m: RegExpExecArray | null;
   while ((m = re.exec(comment))) {
     if (comment[m.index - 1] === '`') continue;
-    const prefix = comment.slice(0, m.index).replace(/^[\s*\/#!-]+/, '');
+    const prefix = comment.slice(0, m.index).replace(/^[\s*/#!-]+/, '');
     const tokens = prefix.split(/\s+/).filter(Boolean);
-    const ok = tokens.length <= 4 && tokens.every((t) => /[@:\-[\]]/.test(t) || /^(?:noqa|nolint|nosonar|pragma|ignore)$/i.test(t));
+    const ok =
+      tokens.length <= 4 &&
+      tokens.every((t) => /[@:\-[\]]/.test(t) || /^(?:noqa|nolint|nosonar|pragma|ignore)$/i.test(t));
     if (ok) return { file: !!m[1], rest: comment.slice(m.index + m[0].length) };
   }
   return null;

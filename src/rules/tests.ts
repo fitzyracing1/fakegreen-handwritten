@@ -1,6 +1,6 @@
-import { anchorFor, Hit, ChangedFile, isMovedLine, squashSpaces, Scan } from '../context';
-import { DiffLine } from '../types';
-import { COND_SKIP, countMatches, FOCUS, INLINE_TEST_LANGS, Pat, SKIP, TEST_DECL } from './patterns';
+import { anchorFor, type Hit, type ChangedFile, isMovedLine, squashSpaces, type Scan } from '../context';
+import { type DiffLine, type Severity } from '../types';
+import { COND_SKIP, countMatches, FOCUS, INLINE_TEST_LANGS, type Pat, SKIP, TEST_DECL } from './patterns';
 
 type Emit = (d: Hit) => void;
 
@@ -70,12 +70,23 @@ export function testFileDeleted(scan: Scan, flag: Emit): Set<ChangedFile> {
     if (frac >= 0.6) continue; // moved/split into other files
     const decls = f.removed.filter((l) => isDecl(f, l));
     const stem = testStem(f.path);
-    const sourceDeleted = scan.files.some((g) => g !== f && g.diff.status === 'deleted' && !g.isTest && testStem(g.path) === stem);
+    const sourceDeleted = scan.files.some(
+      (g) => g !== f && g.diff.status === 'deleted' && !g.isTest && testStem(g.path) === stem,
+    );
     let severity: Hit['severity'] = 'high';
     let message = `Test file deleted (${decls.length} test case${decls.length === 1 ? '' : 's'} removed)`;
-    if (decls.length === 0) { severity = 'low'; message = 'File in a test directory deleted (no test cases detected)'; }
-    if (sourceDeleted && decls.length) { severity = 'medium'; message += ' together with its source file; confirm the feature was really removed'; }
-    if (frac >= 0.3) { severity = 'medium'; message += `; ${Math.round(frac * 100)}% of its lines reappear elsewhere (partial move?)`; }
+    if (decls.length === 0) {
+      severity = 'low';
+      message = 'File in a test directory deleted (no test cases detected)';
+    }
+    if (sourceDeleted && decls.length) {
+      severity = 'medium';
+      message += ' together with its source file; confirm the feature was really removed';
+    }
+    if (frac >= 0.3) {
+      severity = 'medium';
+      message += `; ${Math.round(frac * 100)}% of its lines reappear elsewhere (partial move?)`;
+    }
     reported.add(f);
     flag({ ruleId: 'test-file-deleted', severity, file: f, side: 'file', message, snippet: decls[0]?.text.trim() });
   }
@@ -87,14 +98,18 @@ export function testCountDropped(scan: Scan, flag: Emit) {
   let globalNet = 0;
   for (const [f, s] of stats) {
     const stem = testStem(f.path);
-    const withSource = f.diff.status === 'deleted' && scan.files.some((g) => g !== f && g.diff.status === 'deleted' && !g.isTest && testStem(g.path) === stem);
+    const withSource =
+      f.diff.status === 'deleted' &&
+      scan.files.some((g) => g !== f && g.diff.status === 'deleted' && !g.isTest && testStem(g.path) === stem);
     if (withSource) continue;
     globalNet += s.added.length - s.removed.length;
   }
   for (const [f, s] of stats) {
     if (f.diff.status === 'deleted' || s.lost <= 0) continue;
     const firstUnmoved = s.removed.find((l) => !isMovedLine(scan, l)) ?? s.removed[0];
-    const commented = s.removed.filter((r) => f.added.some((a) => a.comment && a.comment.includes(squashSpaces(r.text).slice(0, 40)))).length;
+    const commented = s.removed.filter((r) =>
+      f.added.some((a) => a.comment && a.comment.includes(squashSpaces(r.text).slice(0, 40))),
+    ).length;
     let message = `Net test cases dropped by ${s.lost} (${s.removed.length} removed, ${s.added.length} added)`;
     if (commented) message += `; ${commented} commented out`;
     let severity: Hit['severity'] = 'high';
@@ -102,7 +117,15 @@ export function testCountDropped(scan: Scan, flag: Emit) {
       severity = 'medium';
       message += '; other tests were added elsewhere in the diff, verify they cover the same behaviour';
     }
-    flag({ ruleId: 'test-count-dropped', severity, file: f, line: firstUnmoved, side: 'removed', message, snippet: firstUnmoved.text.trim() });
+    flag({
+      ruleId: 'test-count-dropped',
+      severity,
+      file: f,
+      line: firstUnmoved,
+      side: 'removed',
+      message,
+      snippet: firstUnmoved.text.trim(),
+    });
   }
 }
 
@@ -131,24 +154,26 @@ export function skipsAndFocus(scan: Scan, flag: Emit) {
     if (f.lang === 'go' && !f.isTest) continue;
     for (const l of f.added) {
       if (isMovedLine(scan, l)) continue;
+      const hit = (ruleId: string, severity: Severity, message: string) =>
+        flag({ ruleId, severity, file: f, line: l, side: 'added', message, snippet: l.text.trim() });
       // node:test / tap options object: test('x', { skip: ... }, fn), { only: true }
       if (f.lang === 'js' && isDecl(f, l)) {
         const opt = /[{,]\s*(skip|todo|only)\s*:\s*([^,}]+)/.exec(l.codeStr);
         if (opt && !/^\s*(?:false|undefined|null|0)\s*$/.test(opt[2])) {
           const literal = /^\s*(?:true|1|'[^']*'|"[^"]*"|`[^`]*`)\s*$/.test(opt[2]);
           if (opt[1] === 'only') {
-            flag({ ruleId: 'test-focused', severity: 'high', file: f, line: l, side: 'added', message: 'Focused test ({ only: ... }) silently disables the rest of the suite', snippet: l.text.trim() });
+            hit('test-focused', 'high', 'Focused test ({ only: ... }) silently disables the rest of the suite');
           } else if (literal) {
-            flag({ ruleId: 'test-skipped', severity: 'high', file: f, line: l, side: 'added', message: `Test skipped with { ${opt[1]}: ${opt[2].trim()} }`, snippet: l.text.trim() });
+            hit('test-skipped', 'high', `Test skipped with { ${opt[1]}: ${opt[2].trim()} }`);
           } else {
-            flag({ ruleId: 'test-conditional-skip', severity: 'low', file: f, line: l, side: 'added', message: `Conditional skip added ({ ${opt[1]}: ${opt[2].trim()} })`, snippet: l.text.trim() });
+            hit('test-conditional-skip', 'low', `Conditional skip added ({ ${opt[1]}: ${opt[2].trim()} })`);
           }
           continue;
         }
       }
       const focus = matchPats(l.code, FOCUS[f.lang]);
       if (focus) {
-        flag({ ruleId: 'test-focused', severity: 'high', file: f, line: l, side: 'added', message: `Focused test (${focus.label}) silently disables the rest of the suite`, snippet: l.text.trim() });
+        hit('test-focused', 'high', `Focused test (${focus.label}) silently disables the rest of the suite`);
         continue;
       }
       const skip = matchPats(l.code, SKIP[f.lang]);
@@ -156,23 +181,35 @@ export function skipsAndFocus(scan: Scan, flag: Emit) {
         // `if testing.Short() { t.Skip() }`, `if (!x) this.skip()`, `if sys.platform == ...: pytest.skip()`
         // are conditional skips. Decorators/modifiers (it.skip, @pytest.mark.skip) never are.
         const prev = prevNewSide(f, l);
-        const callForm = /\b(?:[tb]\.Skip|this\.skip|t\.skip|pytest\.(?:skip|xfail)|self\.skipTest|SkipTest)\b/.test(l.code);
-        const guarded = callForm && (/^\s*(?:\}\s*else\s+)?if\b/.test(l.code) || (!!prev && /^\s*(?:\}\s*else\s+)?(?:if|elif|else)\b.*(?:\{|:)\s*$|^\s*(?:\}\s*)?else\s*(?:\{|:)\s*$/.test(prev.code)));
+        const callForm = /\b(?:[tb]\.Skip|this\.skip|t\.skip|pytest\.(?:skip|xfail)|self\.skipTest|SkipTest)\b/.test(
+          l.code,
+        );
+        const guarded =
+          callForm &&
+          (/^\s*(?:\}\s*else\s+)?if\b/.test(l.code) ||
+            (!!prev &&
+              /^\s*(?:\}\s*else\s+)?(?:if|elif|else)\b.*(?:\{|:)\s*$|^\s*(?:\}\s*)?else\s*(?:\{|:)\s*$/.test(
+                prev.code,
+              )));
         if (guarded) {
-          flag({ ruleId: 'test-conditional-skip', severity: 'low', file: f, line: l, side: 'added', message: `Conditional skip added (${skip.label} inside if)`, snippet: l.text.trim() });
+          hit('test-conditional-skip', 'low', `Conditional skip added (${skip.label} inside if)`);
         } else {
-          flag({ ruleId: 'test-skipped', severity: 'high', file: f, line: l, side: 'added', message: `Test skipped with ${skip.label}`, snippet: l.text.trim() });
+          hit('test-skipped', 'high', `Test skipped with ${skip.label}`);
         }
         continue;
       }
       const cond = matchPats(l.code, COND_SKIP[f.lang]);
       if (cond) {
         // skipif(True) / skipIf(true) is an unconditional skip in disguise.
-        if (/\b(?:skip[Ii]f|skipif|runIf)\s*\(\s*(?:True|true|1|!0|!\s*false)\s*[,)]|\brunIf\s*\(\s*(?:False|false|0)\s*[,)]/.test(l.codeStr)) {
-          flag({ ruleId: 'test-skipped', severity: 'high', file: f, line: l, side: 'added', message: `Test skipped with an always-true condition (${cond.label})`, snippet: l.text.trim() });
+        if (
+          /\b(?:skip[Ii]f|skipif|runIf)\s*\(\s*(?:True|true|1|!0|!\s*false)\s*[,)]|\brunIf\s*\(\s*(?:False|false|0)\s*[,)]/.test(
+            l.codeStr,
+          )
+        ) {
+          hit('test-skipped', 'high', `Test skipped with an always-true condition (${cond.label})`);
           continue;
         }
-        flag({ ruleId: 'test-conditional-skip', severity: 'low', file: f, line: l, side: 'added', message: `Conditional skip added (${cond.label})`, snippet: l.text.trim() });
+        hit('test-conditional-skip', 'low', `Conditional skip added (${cond.label})`);
       }
     }
   }

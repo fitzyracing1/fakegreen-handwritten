@@ -22,35 +22,57 @@ describe('suppression-added', () => {
   });
 
   test('python / go / rust / java suppressions', () => {
-    assert.deepEqual(ids(scanEdit('pkg/f.py', PY, PY.replace('return x * 2', 'return x * 2  # type: ignore'))), ['suppression-added']);
-    assert.deepEqual(ids(scanEdit('pkg/f.py', PY, PY.replace('return x * 2', 'return x * 2  # noqa: E501'))), ['suppression-added']);
+    assert.deepEqual(ids(scanEdit('pkg/f.py', PY, PY.replace('return x * 2', 'return x * 2  # type: ignore'))), [
+      'suppression-added',
+    ]);
+    assert.deepEqual(ids(scanEdit('pkg/f.py', PY, PY.replace('return x * 2', 'return x * 2  # noqa: E501'))), [
+      'suppression-added',
+    ]);
     const go = 'package f\n\nfunc F() int {\n\treturn 1\n}\n';
-    assert.deepEqual(ids(scanEdit('f/f.go', go, go.replace('func F', '//nolint:errcheck\nfunc F'))), ['suppression-added']);
+    assert.deepEqual(ids(scanEdit('f/f.go', go, go.replace('func F', '//nolint:errcheck\nfunc F'))), [
+      'suppression-added',
+    ]);
     const rs = 'pub fn f() -> u8 {\n    1\n}\n';
     assert.deepEqual(ids(scanEdit('src/f.rs', rs, '#[allow(dead_code)]\n' + rs)), ['suppression-added']);
     const crate = scanEdit('src/lib.rs', rs, '#![allow(warnings)]\n' + rs);
     assert.equal(crate[0].severity, 'high');
     const java = 'class F {\n  int f() { return 1; }\n}\n';
-    assert.deepEqual(ids(scanEdit('src/main/java/F.java', java, java.replace('  int f', '  @SuppressWarnings("unchecked")\n  int f'))), ['suppression-added']);
+    assert.deepEqual(
+      ids(scanEdit('src/main/java/F.java', java, java.replace('  int f', '  @SuppressWarnings("unchecked")\n  int f'))),
+      ['suppression-added'],
+    );
   });
 
   test('blanket vs targeted severity', () => {
     const sevOf = (file: string, a: string, b: string) => scanEdit(file, a, b)[0].severity;
     assert.equal(sevOf('pkg/f.py', PY, PY.replace('return x * 2', 'return x * 2  # type: ignore')), 'medium');
-    assert.equal(sevOf('pkg/f.py', PY, PY.replace('return x * 2', 'return x * 2  # type: ignore[attr-defined]')), 'low');
+    assert.equal(
+      sevOf('pkg/f.py', PY, PY.replace('return x * 2', 'return x * 2  # type: ignore[attr-defined]')),
+      'low',
+    );
     assert.equal(sevOf('pkg/f.py', PY, PY.replace('return x * 2', 'return x * 2  # noqa')), 'medium');
     assert.equal(sevOf('pkg/f.py', PY, PY.replace('return x * 2', 'return x * 2  # noqa: F401')), 'low');
     const go = 'package f\n\nfunc F() int {\n\treturn 1\n}\n';
     assert.equal(sevOf('f/f.go', go, go.replace('func F', '//nolint\nfunc F')), 'medium');
     assert.equal(sevOf('f/f.go', go, go.replace('func F', '//nolint:errcheck\nfunc F')), 'low');
     const java = 'class F {\n  int f() { return 1; }\n}\n';
-    assert.equal(sevOf('src/main/java/F.java', java, java.replace('  int f', '  @SuppressWarnings("all")\n  int f')), 'medium');
-    assert.equal(sevOf('src/main/java/F.java', java, java.replace('  int f', '  @SuppressWarnings("unchecked")\n  int f')), 'low');
+    assert.equal(
+      sevOf('src/main/java/F.java', java, java.replace('  int f', '  @SuppressWarnings("all")\n  int f')),
+      'medium',
+    );
+    assert.equal(
+      sevOf('src/main/java/F.java', java, java.replace('  int f', '  @SuppressWarnings("unchecked")\n  int f')),
+      'low',
+    );
     assert.equal(sevOf('src/f.ts', TS, '// @ts-ignore\n' + TS), 'medium');
   });
 
   test('suppression text inside a string is not a suppression', () => {
-    const f = scanEdit('src/f.ts', TS, TS + 'export const hint = "add // @ts-ignore to silence";\nexport const py = "# type: ignore";\n');
+    const f = scanEdit(
+      'src/f.ts',
+      TS,
+      TS + 'export const hint = "add // @ts-ignore to silence";\nexport const py = "# type: ignore";\n',
+    );
     assert.deepEqual(ids(f), []);
   });
 
@@ -61,7 +83,10 @@ describe('suppression-added', () => {
   });
 
   test('markdown files are not scanned', () => {
-    assert.deepEqual(ids(scanChange({ 'README.md': '# x\n' }, { 'README.md': '# x\nUse `// @ts-ignore` and `it.skip`\n' })), []);
+    assert.deepEqual(
+      ids(scanChange({ 'README.md': '# x\n' }, { 'README.md': '# x\nUse `// @ts-ignore` and `it.skip`\n' })),
+      [],
+    );
   });
 });
 
@@ -70,7 +95,9 @@ describe('coverage-exclusion-added', () => {
     const f = scanEdit('src/f.ts', TS, TS.replace('  return', '  /* istanbul ignore next */\n  return'));
     assert.deepEqual(ids(f), ['coverage-exclusion-added']);
     assert.equal(f[0].severity, 'low');
-    assert.deepEqual(ids(scanEdit('pkg/f.py', PY, PY.replace('def f(x):', 'def f(x):  # pragma: no cover'))), ['coverage-exclusion-added']);
+    assert.deepEqual(ids(scanEdit('pkg/f.py', PY, PY.replace('def f(x):', 'def f(x):  # pragma: no cover'))), [
+      'coverage-exclusion-added',
+    ]);
   });
 });
 

@@ -34,6 +34,21 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  style:
+    name: lint + format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      # same check through the shared Action, so this repo stays in step with uniform
+      - uses: fitzyracing1/uniform@v1
+
   dogfood:
     name: fakegreen on its own PR diff
     if: github.event_name == 'pull_request'

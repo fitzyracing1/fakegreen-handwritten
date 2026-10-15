@@ -1,4 +1,4 @@
-import { DiffLine, FileDiff, Hunk } from './types';
+import { type DiffLine, type FileDiff, type Hunk } from './types';
 
 // Has to cope with renames, mode changes, binary files, quoted paths and
 // plain unified diffs that never had a `diff --git` line.
@@ -75,20 +75,48 @@ export function parseDiff(input: string): FileDiff[] {
       f.hunks.push(hunk);
       continue;
     }
-    if (line.startsWith('new file mode')) { f.status = 'added'; f.oldPath = null; continue; }
-    if (line.startsWith('deleted file mode')) { f.status = 'deleted'; f.newPath = null; continue; }
-    if (line.startsWith('rename from ')) { f.oldPath = unquote(line.slice(12)); f.status = 'renamed'; continue; }
-    if (line.startsWith('rename to ')) { f.newPath = unquote(line.slice(10)); f.status = 'renamed'; continue; }
-    if (line.startsWith('similarity index ')) { f.similarity = parseInt(line.slice(17), 10); continue; }
-    if (line.startsWith('Binary files ') || line.startsWith('GIT binary patch')) { f.binary = true; continue; }
+    if (line.startsWith('new file mode')) {
+      f.status = 'added';
+      f.oldPath = null;
+      continue;
+    }
+    if (line.startsWith('deleted file mode')) {
+      f.status = 'deleted';
+      f.newPath = null;
+      continue;
+    }
+    if (line.startsWith('rename from ')) {
+      f.oldPath = unquote(line.slice(12));
+      f.status = 'renamed';
+      continue;
+    }
+    if (line.startsWith('rename to ')) {
+      f.newPath = unquote(line.slice(10));
+      f.status = 'renamed';
+      continue;
+    }
+    if (line.startsWith('similarity index ')) {
+      f.similarity = parseInt(line.slice(17), 10);
+      continue;
+    }
+    if (line.startsWith('Binary files ') || line.startsWith('GIT binary patch')) {
+      f.binary = true;
+      continue;
+    }
     if (line.startsWith('--- ')) {
       const p = stripPrefix(unquote(line.slice(4).replace(/\t.*$/, '')));
-      if (p === null) { f.oldPath = null; f.status = 'added'; } else f.oldPath = p;
+      if (p === null) {
+        f.oldPath = null;
+        f.status = 'added';
+      } else f.oldPath = p;
       continue;
     }
     if (line.startsWith('+++ ')) {
       const p = stripPrefix(unquote(line.slice(4).replace(/\t.*$/, '')));
-      if (p === null) { f.newPath = null; f.status = 'deleted'; } else f.newPath = p;
+      if (p === null) {
+        f.newPath = null;
+        f.status = 'deleted';
+      } else f.newPath = p;
       continue;
     }
   }
@@ -117,12 +145,17 @@ export function unquote(p: string): string {
   const bytes: number[] = [];
   for (let i = 0; i < body.length; i++) {
     const c = body[i];
-    if (c !== '\\') { bytes.push(...Buffer.from(c, 'utf8')); continue; }
+    if (c !== '\\') {
+      bytes.push(...Buffer.from(c, 'utf8'));
+      continue;
+    }
     const n = body[++i];
     const map: Record<string, number> = { n: 10, t: 9, r: 13, '"': 34, '\\': 92, a: 7, b: 8, f: 12, v: 11 };
     if (n in map) bytes.push(map[n]);
-    else if (/[0-7]/.test(n)) { bytes.push(parseInt(body.slice(i, i + 3), 8)); i += 2; }
-    else bytes.push(n.charCodeAt(0));
+    else if (/[0-7]/.test(n)) {
+      bytes.push(parseInt(body.slice(i, i + 3), 8));
+      i += 2;
+    } else bytes.push(n.charCodeAt(0));
   }
   return Buffer.from(bytes).toString('utf8');
 }
@@ -149,7 +182,10 @@ function splitGitHeader(rest: string): [string | null, string | null] {
 
 function findQuoteEnd(s: string, start: number): number {
   for (let i = start + 1; i < s.length; i++) {
-    if (s[i] === '\\') { i++; continue; }
+    if (s[i] === '\\') {
+      i++;
+      continue;
+    }
     if (s[i] === '"') return i;
   }
   return s.length - 1;
@@ -164,10 +200,16 @@ export function addedFileDiff(path: string, content: string): FileDiff {
     status: 'added',
     binary: false,
     hunks: rows.length
-      ? [{
-          oldStart: 0, oldLines: 0, newStart: 1, newLines: rows.length, header: '',
-          lines: rows.map((t, i) => makeLine('+', t, undefined, i + 1)),
-        }]
+      ? [
+          {
+            oldStart: 0,
+            oldLines: 0,
+            newStart: 1,
+            newLines: rows.length,
+            header: '',
+            lines: rows.map((t, i) => makeLine('+', t, undefined, i + 1)),
+          },
+        ]
       : [],
   };
 }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, test } from 'node:test';
 import { blockResponse, detectAgent, runHook } from '../src/hook';
@@ -31,7 +32,9 @@ describe('hook', () => {
 
   test('clean repo: prints nothing, exit 0', () => {
     const dir = tmpRepo({ 'src/a.test.ts': T });
-    const out = runHook(JSON.stringify({ hook_event_name: 'Stop', cwd: dir, session_id: 'clean' }), { agent: 'claude' });
+    const out = runHook(JSON.stringify({ hook_event_name: 'Stop', cwd: dir, session_id: 'clean' }), {
+      agent: 'claude',
+    });
     assert.equal(out.stdout, '');
     assert.equal(out.exitCode, 0);
     fs.rmSync(dir, { recursive: true, force: true });
@@ -40,10 +43,27 @@ describe('hook', () => {
   for (const agent of ['claude', 'codex', 'gemini'] as const) {
     test(`${agent}: blocks with findings as feedback`, () => {
       const dir = dirty();
-      const input = agent === 'gemini'
-        ? { hook_event_name: 'AfterAgent', cwd: dir, session_id: 's-' + agent, prompt: 'fix tests', prompt_response: 'All tests pass!', stop_hook_active: false }
-        : { hook_event_name: 'Stop', cwd: dir, session_id: 's-' + agent, stop_hook_active: false, ...(agent === 'codex' ? { turn_id: 't1' } : {}) };
-      const r = spawnSync(process.execPath, [CLI, 'hook', '--agent', agent], { input: JSON.stringify(input), encoding: 'utf8' });
+      const input =
+        agent === 'gemini'
+          ? {
+              hook_event_name: 'AfterAgent',
+              cwd: dir,
+              session_id: 's-' + agent,
+              prompt: 'fix tests',
+              prompt_response: 'All tests pass!',
+              stop_hook_active: false,
+            }
+          : {
+              hook_event_name: 'Stop',
+              cwd: dir,
+              session_id: 's-' + agent,
+              stop_hook_active: false,
+              ...(agent === 'codex' ? { turn_id: 't1' } : {}),
+            };
+      const r = spawnSync(process.execPath, [CLI, 'hook', '--agent', agent], {
+        input: JSON.stringify(input),
+        encoding: 'utf8',
+      });
       assert.equal(r.status, 0);
       const j = JSON.parse(r.stdout);
       assert.equal(j.decision, agent === 'gemini' ? 'deny' : 'block');
@@ -69,7 +89,7 @@ describe('hook', () => {
   });
 
   test('not a git repo / garbage stdin: fail open silently', () => {
-    const notRepo = fs.mkdtempSync(path.join(require('os').tmpdir(), 'fg-hook-'));
+    const notRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'fg-hook-'));
     assert.equal(runHook(JSON.stringify({ cwd: notRepo })).stdout, '');
     const r = spawnSync(process.execPath, [CLI, 'hook'], { input: 'not json', cwd: notRepo, encoding: 'utf8' });
     assert.equal(r.status, 0);
@@ -80,7 +100,11 @@ describe('hook', () => {
     const dir = tmpRepo({ 'src/b.ts': 'export const b = 1;\n' });
     writeFiles(dir, { 'src/b.ts': '// @ts-ignore\nexport const b = 1;\n' });
     assert.equal(runHook(JSON.stringify({ cwd: dir, session_id: 'm' }), { agent: 'claude' }).stdout, '');
-    assert.equal(JSON.parse(runHook(JSON.stringify({ cwd: dir, session_id: 'm2' }), { agent: 'claude', failOn: 'medium' }).stdout).decision, 'block');
+    assert.equal(
+      JSON.parse(runHook(JSON.stringify({ cwd: dir, session_id: 'm2' }), { agent: 'claude', failOn: 'medium' }).stdout)
+        .decision,
+      'block',
+    );
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });

@@ -1,4 +1,4 @@
-import { Lang } from '../types';
+import { type Lang } from '../types';
 
 // All patterns run against lexed code (comments removed, string contents blanked)
 // unless noted otherwise. Keep them specific: precision beats recall here.
@@ -11,7 +11,9 @@ export const TEST_DECL: Partial<Record<Lang, RegExp[]>> = {
   py: [/^\s*(?:async\s+)?def\s+test\w*\s*\(/],
   go: [/^\s*func\s+(?:Test(?!Main\b)\w*|Fuzz\w+)\s*\(/, /\bt\.Run\s*\(/],
   rust: [/#\[\s*(?:[\w:]+::)?test\s*[\](]/, /#\[\s*(?:rstest|test_case|quickcheck)\b/],
-  java: [/@(?:org\.junit(?:\.jupiter\.api)?\.)?(?:Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\b(?![\w.])/],
+  java: [
+    /@(?:org\.junit(?:\.jupiter\.api)?\.)?(?:Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\b(?![\w.])/,
+  ],
 };
 
 // Languages whose test declarations may legitimately live in non-test-path files.
@@ -27,11 +29,17 @@ export function countMatches(code: string, res: RegExp[] | undefined): number {
   return n;
 }
 
-export interface Pat { re: RegExp; label: string }
+export interface Pat {
+  re: RegExp;
+  label: string;
+}
 
 export const SKIP: Partial<Record<Lang, Pat[]>> = {
   js: [
-    { re: /(?<![\w$.])(?:describe|it|test|context|suite|specify)(?:\.(?:describe|serial|parallel|concurrent|each))*\.(?:skip|fixme)\b/, label: '.skip' },
+    {
+      re: /(?<![\w$.])(?:describe|it|test|context|suite|specify)(?:\.(?:describe|serial|parallel|concurrent|each))*\.(?:skip|fixme)\b/,
+      label: '.skip',
+    },
     { re: /(?<![\w$.])x(?:it|describe|test|context|specify)\s*\(/, label: 'x-prefixed test' },
     { re: /\bthis\.skip\s*\(\s*\)/, label: 'this.skip()' },
     { re: /(?<![\w$.])t\.skip\s*\(/, label: 't.skip()' },
@@ -47,9 +55,7 @@ export const SKIP: Partial<Record<Lang, Pat[]>> = {
   ],
   go: [{ re: /\b[tb]\.Skip(?:f|Now)?\s*\(/, label: 't.Skip()' }],
   rust: [{ re: /#\[\s*ignore\b/, label: '#[ignore]' }],
-  java: [
-    { re: /@(?:org\.junit(?:\.jupiter\.api)?\.)?(?:Disabled|Ignore)\b(?![\w.])/, label: '@Disabled/@Ignore' },
-  ],
+  java: [{ re: /@(?:org\.junit(?:\.jupiter\.api)?\.)?(?:Disabled|Ignore)\b(?![\w.])/, label: '@Disabled/@Ignore' }],
 };
 
 // Conditional skips: often legitimate, still worth a look.
@@ -68,7 +74,10 @@ export const COND_SKIP: Partial<Record<Lang, Pat[]>> = {
 
 export const FOCUS: Partial<Record<Lang, Pat[]>> = {
   js: [
-    { re: /(?<![\w$.])(?:describe|it|test|context|suite|specify)(?:\.(?:describe|serial|parallel|concurrent|each))*\.only\b/, label: '.only' },
+    {
+      re: /(?<![\w$.])(?:describe|it|test|context|suite|specify)(?:\.(?:describe|serial|parallel|concurrent|each))*\.only\b/,
+      label: '.only',
+    },
     { re: /(?<![\w$.])f(?:it|describe)\s*\(/, label: 'fit/fdescribe' },
   ],
 };
@@ -90,25 +99,50 @@ export const ASSERT: Partial<Record<Lang, RegExp[]>> = {
     /\b(?:np|numpy)\.testing\.assert\w*\s*\(/,
   ],
   go: [/\bt\.(?:Error|Errorf|Fatal|Fatalf|Fail|FailNow)\s*\(/, /\b(?:assert|require|is|qt)\.\w+\s*\(/],
-  rust: [/\b(?:assert|assert_eq|assert_ne|debug_assert|debug_assert_eq|debug_assert_ne|assert_matches|prop_assert|prop_assert_eq)!\s*[([]/],
-  java: [/(?<![\w.])assert\w*\s*\(/, /\bAssertions\.assert\w*\s*\(/, /(?<![\w.])verify\s*\(/, /(?<![\w.])fail\s*\(/, /^\s*assert\s/, /\s(?:shouldBe|shouldNotBe|shouldThrow|shouldContain)\b/],
+  rust: [
+    /\b(?:assert|assert_eq|assert_ne|debug_assert|debug_assert_eq|debug_assert_ne|assert_matches|prop_assert|prop_assert_eq)!\s*[([]/,
+  ],
+  java: [
+    /(?<![\w.])assert\w*\s*\(/,
+    /\bAssertions\.assert\w*\s*\(/,
+    /(?<![\w.])verify\s*\(/,
+    /(?<![\w.])fail\s*\(/,
+    /^\s*assert\s/,
+    /\s(?:shouldBe|shouldNotBe|shouldThrow|shouldContain)\b/,
+  ],
 };
 
 // Strong (specific) assertions, used to detect weakening.
 export const STRONG: Partial<Record<Lang, Pat[]>> = {
   js: [
-    { re: /\.(toBe|toEqual|toStrictEqual|toMatchObject|toHaveBeenCalledWith|toHaveBeenCalledTimes|toHaveBeenNthCalledWith|toContain|toContainEqual|toHaveLength|toMatch|toMatchInlineSnapshot|toHaveProperty|toBeCloseTo|toThrow(?:Error)?(?=\s*\(\s*\S)(?!\s*\(\s*\)))\s*\(/, label: '' },
+    {
+      re: /\.(toBe|toEqual|toStrictEqual|toMatchObject|toHaveBeenCalledWith|toHaveBeenCalledTimes|toHaveBeenNthCalledWith|toContain|toContainEqual|toHaveLength|toMatch|toMatchInlineSnapshot|toHaveProperty|toBeCloseTo|toThrow(?:Error)?(?=\s*\(\s*\S)(?!\s*\(\s*\)))\s*\(/,
+      label: '',
+    },
     { re: /\bassert\.(equal|strictEqual|deepEqual|deepStrictEqual|throws|rejects|match|notEqual)\s*\(/, label: '' },
     { re: /\.to\.(?:deep\.)?(equal|eql|have\.length|include|throw)\b/, label: '' },
   ],
   py: [
     { re: /^\s*assert\s+.*(?:==|!=|<=|>=|<|>|\bnot in\b|\bin\b|\bis\s+(?!not\s+None\b)(?!None\b)\w)/, label: '' },
-    { re: /\bself\.assert(Equal|Equals|NotEqual|DictEqual|ListEqual|SetEqual|TupleEqual|SequenceEqual|In|NotIn|Raises|RaisesRegex|AlmostEqual|CountEqual|Is|Greater|GreaterEqual|Less|LessEqual|Regex)\s*\(/, label: '' },
+    {
+      re: /\bself\.assert(Equal|Equals|NotEqual|DictEqual|ListEqual|SetEqual|TupleEqual|SequenceEqual|In|NotIn|Raises|RaisesRegex|AlmostEqual|CountEqual|Is|Greater|GreaterEqual|Less|LessEqual|Regex)\s*\(/,
+      label: '',
+    },
     { re: /\bpytest\.raises\s*\(/, label: '' },
   ],
-  go: [{ re: /\b(?:assert|require)\.(Equal\w*|Exactly|ErrorIs|ErrorAs|ErrorContains|EqualError|Len|Contains|JSONEq|ElementsMatch|InDelta)\s*\(/, label: '' }],
+  go: [
+    {
+      re: /\b(?:assert|require)\.(Equal\w*|Exactly|ErrorIs|ErrorAs|ErrorContains|EqualError|Len|Contains|JSONEq|ElementsMatch|InDelta)\s*\(/,
+      label: '',
+    },
+  ],
   rust: [{ re: /\b(assert_eq|assert_ne|assert_matches|prop_assert_eq)!\s*[([]/, label: '' }],
-  java: [{ re: /\b(assertEquals|assertArrayEquals|assertSame|assertThrows|assertIterableEquals|assertLinesMatch|isEqualTo|containsExactly|hasSize|isEqualByComparingTo)\s*\(/, label: '' }],
+  java: [
+    {
+      re: /\b(assertEquals|assertArrayEquals|assertSame|assertThrows|assertIterableEquals|assertLinesMatch|isEqualTo|containsExactly|hasSize|isEqualByComparingTo)\s*\(/,
+      label: '',
+    },
+  ],
 };
 
 // Weak assertions that pass for almost any value.
@@ -124,7 +158,7 @@ export const WEAK: Partial<Record<Lang, Pat[]>> = {
   ],
   py: [
     { re: /^\s*assert\s+(?:not\s+)?[\w.]+(?:\(\))?\s*(?:,.*)?$/, label: '' },
-    { re: /^\s*assert\s+[\w.\[\]'"()]+\s+is\s+not\s+None\s*(?:,.*)?$/, label: '' },
+    { re: /^\s*assert\s+[\w.[\]'"()]+\s+is\s+not\s+None\s*(?:,.*)?$/, label: '' },
     { re: /\bself\.assertIsNotNone\s*\(/, label: '' },
     { re: /\bself\.assert(?:True|IsInstance)\s*\(\s*[\w.()]+\s*(?:,\s*\w+\s*)?\)/, label: '' },
   ],
@@ -150,9 +184,17 @@ export const TRIVIAL: Partial<Record<Lang, RegExp[]>> = {
     /\bself\.assertFalse\s*\(\s*(?:False|0|None)\s*\)/,
     /\bself\.assertEqual\s*\(\s*(True|False|None|-?\d+|'[^']*'|"[^"]*")\s*,\s*\1\s*\)/,
   ],
-  go: [/\b(?:assert|require)\.True\s*\(\s*t\s*,\s*true\s*\)/, /\b(?:assert|require)\.Equal\s*\(\s*t\s*,\s*(-?\d+|"[^"]*"|true)\s*,\s*\1\s*\)/],
+  go: [
+    /\b(?:assert|require)\.True\s*\(\s*t\s*,\s*true\s*\)/,
+    /\b(?:assert|require)\.Equal\s*\(\s*t\s*,\s*(-?\d+|"[^"]*"|true)\s*,\s*\1\s*\)/,
+  ],
   rust: [/\bassert!\s*\(\s*true\s*\)/, /\bassert_eq!\s*\(\s*(true|false|-?\d+|"[^"]*")\s*,\s*\1\s*\)/],
-  java: [/\bassertTrue\s*\(\s*true\s*\)/, /\bassertFalse\s*\(\s*false\s*\)/, /\bassertEquals\s*\(\s*(true|false|-?\d+L?|"[^"]*")\s*,\s*\1\s*\)/, /\bassertThat\s*\(\s*true\s*\)\s*\.isTrue\s*\(\s*\)/],
+  java: [
+    /\bassertTrue\s*\(\s*true\s*\)/,
+    /\bassertFalse\s*\(\s*false\s*\)/,
+    /\bassertEquals\s*\(\s*(true|false|-?\d+L?|"[^"]*")\s*,\s*\1\s*\)/,
+    /\bassertThat\s*\(\s*true\s*\)\s*\.isTrue\s*\(\s*\)/,
+  ],
 };
 
 // Commands that run tests / checks. Used for CI weakening and removed-step detection.
