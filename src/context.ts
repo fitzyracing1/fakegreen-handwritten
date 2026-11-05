@@ -1,8 +1,27 @@
-import { ResolvedConfig } from './config';
+import { type ResolvedConfig } from './config';
 import { filePath } from './diff';
 import { matchesAny } from './glob';
-import { fileKind, findDirective, flavorOf, Flavor, isConfigFile, isTestPath, isTestSupportPath, langOf, lexLine, newLexState } from './lang';
-import { DiffLine, FileDiff, FileKind, Finding, Hunk, Lang, Severity } from './types';
+import {
+  fileKind,
+  findDirective,
+  flavorOf,
+  type Flavor,
+  isConfigFile,
+  isTestPath,
+  isTestSupportPath,
+  langOf,
+  lexLine,
+  newLexState,
+} from './lang';
+import {
+  type DiffLine,
+  type FileDiff,
+  type FileKind,
+  type Finding,
+  type Hunk,
+  type Lang,
+  type Severity,
+} from './types';
 
 export interface ChangedFile {
   path: string;
@@ -79,7 +98,8 @@ export function prepareScan(diffs: FileDiff[], config: ResolvedConfig): Scan {
         }
         if (l.kind === '+') entry.added.push(l);
         if (l.kind === '-') entry.removed.push(l);
-        if (l.kind !== '-' && findDirective(flavor === 'none' ? l.text : (l.comment ?? ''))?.file) entry.ignoreFile = true;
+        if (l.kind !== '-' && findDirective(flavor === 'none' ? l.text : (l.comment ?? ''))?.file)
+          entry.ignoreFile = true;
       }
     }
     for (const l of entry.removed) countLine(removedText, squashSpaces(l.text));

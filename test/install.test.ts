@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, test } from 'node:test';
 import { applyPlan, planInstall } from '../src/install';
@@ -10,7 +11,16 @@ const CLI = path.join(__dirname, '..', '..', 'dist', 'cli.js');
 
 describe('install', () => {
   test('claude: merges into existing settings and is idempotent', () => {
-    const dir = tmpRepo({ '.claude/settings.json': JSON.stringify({ permissions: { allow: ['Bash(ls)'] }, hooks: { PostToolUse: [{ matcher: 'Edit', hooks: [{ type: 'command', command: 'prettier' }] }] } }, null, 2) });
+    const dir = tmpRepo({
+      '.claude/settings.json': JSON.stringify(
+        {
+          permissions: { allow: ['Bash(ls)'] },
+          hooks: { PostToolUse: [{ matcher: 'Edit', hooks: [{ type: 'command', command: 'prettier' }] }] },
+        },
+        null,
+        2,
+      ),
+    });
     const plan = planInstall('claude', { cwd: dir });
     assert.equal(plan.alreadyInstalled, false);
     applyPlan(plan);
@@ -25,9 +35,14 @@ describe('install', () => {
 
   test('claude --global / --local and custom command', () => {
     const dir = tmpRepo();
-    const home = fs.mkdtempSync(path.join(require('os').tmpdir(), 'fg-home-'));
-    assert.equal(planInstall('claude', { cwd: dir, global: true, home }).file, path.join(home, '.claude/settings.json'));
-    assert.ok(planInstall('claude', { cwd: dir, local: true }).file.endsWith(path.normalize('.claude/settings.local.json')));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'fg-home-'));
+    assert.equal(
+      planInstall('claude', { cwd: dir, global: true, home }).file,
+      path.join(home, '.claude/settings.json'),
+    );
+    assert.ok(
+      planInstall('claude', { cwd: dir, local: true }).file.endsWith(path.normalize('.claude/settings.local.json')),
+    );
     const p = planInstall('claude', { cwd: dir, command: 'node /opt/fg/cli.js', hookArgs: '--base origin/main' });
     assert.match(p.after, /node \/opt\/fg\/cli\.js hook --agent claude --base origin\/main/);
   });
@@ -65,7 +80,10 @@ describe('install', () => {
     const p = planInstall('pre-commit', { cwd: dir });
     applyPlan(p);
     const text = fs.readFileSync(hook, 'utf8');
-    assert.match(text, /^#!\/bin\/sh\n# >>> fakegreen >>>\nnpx --yes fakegreen --staged \|\| exit \$\?\n# <<< fakegreen <<<\necho existing\n$/);
+    assert.match(
+      text,
+      /^#!\/bin\/sh\n# >>> fakegreen >>>\nnpx --yes fakegreen --staged \|\| exit \$\?\n# <<< fakegreen <<<\necho existing\n$/,
+    );
     // Windows has no POSIX exec bit (statSync reports none); Git for Windows runs hooks regardless.
     if (process.platform !== 'win32') assert.ok(fs.statSync(hook).mode & 0o100);
     assert.equal(planInstall('pre-commit', { cwd: dir }).alreadyInstalled, true);

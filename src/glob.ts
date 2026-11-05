@@ -18,7 +18,14 @@ export function globToRegExp(pattern: string): RegExp {
     else if (c === '{') {
       const end = p.indexOf('}', i);
       if (end > i) {
-        re += '(?:' + p.slice(i + 1, end).split(',').map(escape).join('|') + ')';
+        re +=
+          '(?:' +
+          p
+            .slice(i + 1, end)
+            .split(',')
+            .map(escape)
+            .join('|') +
+          ')';
         i = end;
       } else re += '\\{';
     } else re += escape(c);

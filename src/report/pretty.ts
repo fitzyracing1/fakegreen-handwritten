@@ -1,6 +1,6 @@
-import { ScanStats } from '../analyze';
-import { Finding, SEVERITY_RANK, Severity } from '../types';
-import { Colors } from './color';
+import { type ScanStats } from '../analyze';
+import { type Finding, SEVERITY_RANK, type Severity } from '../types';
+import { type Colors } from './color';
 
 export interface PrettyOptions {
   c: Colors;
@@ -13,9 +13,12 @@ export interface PrettyOptions {
 export function renderPretty(findings: Finding[], stats: ScanStats, o: PrettyOptions): string {
   const { c } = o;
   const out: string[] = [];
-  const badge = (s: Severity) => (s === 'high' ? c.bgRed(' HIGH ') : s === 'medium' ? c.bgYellow(' MED  ') : c.bgBlue(' LOW  '));
+  const badge = (s: Severity) =>
+    s === 'high' ? c.bgRed(' HIGH ') : s === 'medium' ? c.bgYellow(' MED  ') : c.bgBlue(' LOW  ');
   out.push('');
-  out.push(`${c.bold('fakegreen')} ${c.gray('·')} ${o.description} ${c.gray(`· ${stats.analyzedFiles}/${stats.files} files · +${stats.added} −${stats.removed}`)}`);
+  out.push(
+    `${c.bold('fakegreen')} ${c.gray('·')} ${o.description} ${c.gray(`· ${stats.analyzedFiles}/${stats.files} files · +${stats.added} −${stats.removed}`)}`,
+  );
   out.push('');
   if (!findings.length) {
     out.push(`  ${c.green('✔')} ${c.bold('No fake-green patterns found.')}`);

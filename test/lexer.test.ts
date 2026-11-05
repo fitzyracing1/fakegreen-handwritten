@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { lexLine, newLexState } from '../src/lang';
+import { findDirective, lexLine, newLexState } from '../src/lang';
 
 const lex = (s: string, lang: any = 'js', flavor: any = 'c') => lexLine(s, lang, flavor, newLexState());
 
 test('blanks string contents but keeps code', () => {
   const r = lex(`const s = "it.skip('x')"; it('y', fn);`);
   assert.ok(!r.code.includes('skip'));
-  assert.ok(r.code.includes("it("));
+  assert.ok(r.code.includes('it('));
   assert.ok(r.codeStr.includes('it.skip'));
 });
 
@@ -61,8 +61,10 @@ test('JS regex literals are blanked, division is not', () => {
 });
 
 test('fakegreen-ignore directives must lead the comment', () => {
-  const { findDirective } = require('../src/lang');
-  assert.deepEqual(findDirective(' fakegreen-ignore test-skipped -- flaky'), { file: false, rest: ' test-skipped -- flaky' });
+  assert.deepEqual(findDirective(' fakegreen-ignore test-skipped -- flaky'), {
+    file: false,
+    rest: ' test-skipped -- flaky',
+  });
   assert.equal(findDirective(' @ts-ignore fakegreen-ignore: upstream types')?.file, false);
   assert.equal(findDirective('* fakegreen-ignore-file: generated')?.file, true);
   assert.equal(findDirective(' Parse the rule list of a fakegreen-ignore directive'), null);

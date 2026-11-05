@@ -1,5 +1,5 @@
-import { ResolvedConfig } from './config';
-import { anchorFor, prepareScan, Hit, Scan } from './context';
+import { type ResolvedConfig } from './config';
+import { anchorFor, prepareScan, type Hit, type Scan } from './context';
 import { parseDiff } from './diff';
 import { assertionChanges, assertionsRemoved } from './rules/assertions';
 import { ciRules } from './rules/ci';
@@ -8,7 +8,7 @@ import { errorSwallowed, testEnvSpecialCase } from './rules/source';
 import { suppressions } from './rules/suppressions';
 import { skipsAndFocus, testCountDropped, testFileDeleted } from './rules/tests';
 import { findDirective } from './lang';
-import { DiffLine, FileDiff, Finding, SEVERITY_RANK, Severity } from './types';
+import { type DiffLine, type FileDiff, type Finding, SEVERITY_RANK, type Severity } from './types';
 
 export interface ScanStats {
   files: number;
@@ -99,8 +99,13 @@ export function runRules(scan: Scan): Finding[] {
 }
 
 export function sortFindings(fs: Finding[]): Finding[] {
-  return fs.sort((a, b) =>
-    a.file.localeCompare(b.file) || (a.line ?? 0) - (b.line ?? 0) || SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] || a.ruleId.localeCompare(b.ruleId));
+  return fs.sort(
+    (a, b) =>
+      a.file.localeCompare(b.file) ||
+      (a.line ?? 0) - (b.line ?? 0) ||
+      SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] ||
+      a.ruleId.localeCompare(b.ruleId),
+  );
 }
 
 export function analyzeDiffs(diffs: FileDiff[], config: ResolvedConfig): ScanResult {
@@ -108,7 +113,12 @@ export function analyzeDiffs(diffs: FileDiff[], config: ResolvedConfig): ScanRes
   const findings = runRules(scan);
   let added = 0;
   let removed = 0;
-  for (const d of diffs) for (const h of d.hunks) for (const l of h.lines) { if (l.kind === '+') added++; else if (l.kind === '-') removed++; }
+  for (const d of diffs)
+    for (const h of d.hunks)
+      for (const l of h.lines) {
+        if (l.kind === '+') added++;
+        else if (l.kind === '-') removed++;
+      }
   return { findings, stats: { files: diffs.length, analyzedFiles: scan.files.length, added, removed } };
 }
 

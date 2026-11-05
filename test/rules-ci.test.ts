@@ -24,17 +24,27 @@ describe('ci-failure-ignored', () => {
   });
 
   test('|| true on an unrelated command is low', () => {
-    const f = scanEdit(WFP, WF, WF.replace('      - run: npm ci\n', '      - run: npm ci\n      - run: rm -rf .cache || true\n'));
+    const f = scanEdit(
+      WFP,
+      WF,
+      WF.replace('      - run: npm ci\n', '      - run: npm ci\n      - run: rm -rf .cache || true\n'),
+    );
     assert.equal(f[0].severity, 'low');
   });
 
   test('continue-on-error, allow_failure, --exit-zero', () => {
-    const f = scanEdit(WFP, WF, WF.replace('      - run: npm test\n', '      - run: npm test\n        continue-on-error: true\n'));
+    const f = scanEdit(
+      WFP,
+      WF,
+      WF.replace('      - run: npm test\n', '      - run: npm test\n        continue-on-error: true\n'),
+    );
     assert.deepEqual(ids(f), ['ci-failure-ignored']);
     const gl = 'test:\n  script:\n    - pytest\n';
     assert.deepEqual(ids(scanEdit('.gitlab-ci.yml', gl, gl + '  allow_failure: true\n')), ['ci-failure-ignored']);
     const mk = 'lint:\n\truff check .\n';
-    assert.deepEqual(ids(scanEdit('Makefile', mk, mk.replace('ruff check .', 'ruff check . --exit-zero'))), ['ci-failure-ignored']);
+    assert.deepEqual(ids(scanEdit('Makefile', mk, mk.replace('ruff check .', 'ruff check . --exit-zero'))), [
+      'ci-failure-ignored',
+    ]);
   });
 
   test('package.json scripts', () => {
@@ -44,7 +54,11 @@ describe('ci-failure-ignored', () => {
   });
 
   test('comment mentioning || true is ignored', () => {
-    const f = scanEdit(WFP, WF, WF.replace('      - run: npm test\n', '      # never add || true here\n      - run: npm test\n'));
+    const f = scanEdit(
+      WFP,
+      WF,
+      WF.replace('      - run: npm test\n', '      # never add || true here\n      - run: npm test\n'),
+    );
     assert.deepEqual(ids(f), []);
   });
 });
@@ -63,8 +77,12 @@ describe('ci-step-removed / ci-step-disabled', () => {
   });
 
   test('moving the step to another workflow is fine', () => {
-    const other = 'name: tests\non: [push]\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n';
-    const f = scanChange({ [WFP]: WF }, { [WFP]: WF.replace('      - run: npm test\n', ''), '.github/workflows/tests.yml': other });
+    const other =
+      'name: tests\non: [push]\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n';
+    const f = scanChange(
+      { [WFP]: WF },
+      { [WFP]: WF.replace('      - run: npm test\n', ''), '.github/workflows/tests.yml': other },
+    );
     assert.deepEqual(ids(f), []);
   });
 
@@ -81,10 +99,15 @@ describe('ci-step-removed / ci-step-disabled', () => {
   });
 
   test('yaml keys and maven args that merely contain tool names are not commands', () => {
-    const m = 'jobs:\n  t:\n    strategy:\n      matrix:\n        include:\n          - {python: "3.13", tox: "py3.13"}\n          - {python: "3.14", tox: "py3.14"}\n';
+    const m =
+      'jobs:\n  t:\n    strategy:\n      matrix:\n        include:\n          - {python: "3.13", tox: "py3.13"}\n          - {python: "3.14", tox: "py3.14"}\n';
     assert.deepEqual(ids(scanEdit(WFP, m, m.replace('          - {python: "3.14", tox: "py3.14"}\n', ''))), []);
-    const g = 'jobs:\n  b:\n    steps:\n      - uses: x/build@v1\n        with:\n          extra-mvn-args: --projects \'!test-shrinker\'\n';
-    assert.deepEqual(ids(scanEdit(WFP, g, g.replace("          extra-mvn-args: --projects '!test-shrinker'\n", ''))), []);
+    const g =
+      "jobs:\n  b:\n    steps:\n      - uses: x/build@v1\n        with:\n          extra-mvn-args: --projects '!test-shrinker'\n";
+    assert.deepEqual(
+      ids(scanEdit(WFP, g, g.replace("          extra-mvn-args: --projects '!test-shrinker'\n", ''))),
+      [],
+    );
   });
 
   test('deleted workflow file that ran tests', () => {
@@ -112,7 +135,10 @@ describe('test-script-neutered / test-exclusion-added', () => {
     assert.ok(ids(f).includes('test-script-neutered'));
   });
   test('npm init default (exit 1) is not neutered', () => {
-    const f = scanChange({}, { 'package.json': '{\n  "scripts": {\n    "test": "echo \\"Error: no test specified\\" && exit 1"\n  }\n}\n' });
+    const f = scanChange(
+      {},
+      { 'package.json': '{\n  "scripts": {\n    "test": "echo \\"Error: no test specified\\" && exit 1"\n  }\n}\n' },
+    );
     assert.deepEqual(only(f, 'test-script-neutered'), []);
   });
   test('--passWithNoTests and -DskipTests', () => {
@@ -126,13 +152,16 @@ describe('test-script-neutered / test-exclusion-added', () => {
   });
   test('pytest --deselect / --ignore=tests', () => {
     const tox = '[testenv]\ncommands = pytest\n';
-    assert.deepEqual(ids(scanEdit('tox.ini', tox, tox.replace('pytest', 'pytest --ignore=tests/integration'))), ['test-exclusion-added']);
+    assert.deepEqual(ids(scanEdit('tox.ini', tox, tox.replace('pytest', 'pytest --ignore=tests/integration'))), [
+      'test-exclusion-added',
+    ]);
   });
 });
 
 describe('coverage-threshold-lowered', () => {
   test('jest coverageThreshold lowered', () => {
-    const cfg = 'module.exports = {\n  coverageThreshold: {\n    global: {\n      branches: 90,\n      lines: 90,\n    },\n  },\n};\n';
+    const cfg =
+      'module.exports = {\n  coverageThreshold: {\n    global: {\n      branches: 90,\n      lines: 90,\n    },\n  },\n};\n';
     const f = scanEdit('jest.config.js', cfg, cfg.replace('lines: 90', 'lines: 50'));
     const c = only(f, 'coverage-threshold-lowered');
     assert.equal(c.length, 1);

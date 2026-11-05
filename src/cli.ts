@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { analyzeDiffs, meetsThreshold } from './analyze';
 import { ConfigError, loadConfig } from './config';
 import { parseDiff } from './diff';
-import { DiffMode, getDiff, GitError, repoRoot } from './git';
+import { type DiffMode, getDiff, GitError, repoRoot } from './git';
 import { runHook } from './hook';
-import { applyPlan, confirm, INSTALL_TARGETS, InstallTarget, planInstall, renderPlan } from './install';
+import { applyPlan, confirm, INSTALL_TARGETS, type InstallTarget, planInstall, renderPlan } from './install';
 import { colors, shouldColor } from './report/color';
 import { renderGithub, renderJson, renderSarif, VERSION } from './report/machine';
 import { filterMin, renderPretty } from './report/pretty';
 import { RULES } from './rules/registry';
-import { Severity } from './types';
+import { type Severity } from './types';
 
 const HELP = `fakegreen ${VERSION}
 One command scans your agent's diff and flags every way it faked a green build.
@@ -54,21 +54,42 @@ interface Args {
   flags: Record<string, string | boolean>;
 }
 
-const VALUE_FLAGS = new Set(['base', 'commit', 'diff', 'format', 'fail-on', 'min-severity', 'cwd', 'config', 'agent', 'command', 'hook-args']);
+const VALUE_FLAGS = new Set([
+  'base',
+  'commit',
+  'diff',
+  'format',
+  'fail-on',
+  'min-severity',
+  'cwd',
+  'config',
+  'agent',
+  'command',
+  'hook-args',
+]);
 const ALIASES: Record<string, string> = { C: 'cwd', y: 'yes', h: 'help', v: 'version' };
 
 export function parseArgs(argv: string[]): Args {
   const out: Args = { _: [], flags: {} };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--') { out._.push(...argv.slice(i + 1)); break; }
+    if (a === '--') {
+      out._.push(...argv.slice(i + 1));
+      break;
+    }
     if (a.startsWith('--') || (a.startsWith('-') && a.length === 2)) {
       let name = a.replace(/^--?/, '');
       let value: string | boolean | undefined;
       const eq = name.indexOf('=');
-      if (eq >= 0) { value = name.slice(eq + 1); name = name.slice(0, eq); }
+      if (eq >= 0) {
+        value = name.slice(eq + 1);
+        name = name.slice(0, eq);
+      }
       name = ALIASES[name] ?? name;
-      if (name.startsWith('no-') && !VALUE_FLAGS.has(name)) { out.flags[name.slice(3)] = false; continue; }
+      if (name.startsWith('no-') && !VALUE_FLAGS.has(name)) {
+        out.flags[name.slice(3)] = false;
+        continue;
+      }
       if (VALUE_FLAGS.has(name) && value === undefined) {
         value = argv[++i];
         if (value === undefined) throw new UsageError(`--${name} needs a value`);
@@ -90,7 +111,9 @@ function parseSeverity(v: unknown, name: string, allowNone = false): Severity | 
 }
 
 function pickDiffMode(flags: Args['flags']): DiffMode {
-  const chosen = ['staged', 'base', 'last-commit', 'commit'].filter((k) => flags[k] !== undefined && flags[k] !== false);
+  const chosen = ['staged', 'base', 'last-commit', 'commit'].filter(
+    (k) => flags[k] !== undefined && flags[k] !== false,
+  );
   if (chosen.length > 1) throw new UsageError(`Choose only one of --staged, --base, --last-commit, --commit`);
   if (flags.staged) return { kind: 'staged' };
   if (typeof flags.base === 'string') return { kind: 'base', ref: flags.base };
@@ -100,20 +123,31 @@ function pickDiffMode(flags: Args['flags']): DiffMode {
 }
 
 function readStdin(): string {
-  try { return fs.readFileSync(0, 'utf8'); } catch { return ''; }
+  try {
+    return fs.readFileSync(0, 'utf8');
+  } catch {
+    return '';
+  }
 }
 
 async function main(argv: string[]): Promise<number> {
   const args = parseArgs(argv);
   const flags = args.flags;
-  if (flags.version) { process.stdout.write(VERSION + '\n'); return 0; }
-  if (flags.help) { process.stdout.write(HELP + '\n'); return 0; }
+  if (flags.version) {
+    process.stdout.write(VERSION + '\n');
+    return 0;
+  }
+  if (flags.help) {
+    process.stdout.write(HELP + '\n');
+    return 0;
+  }
   const cwd = path.resolve(typeof flags.cwd === 'string' ? flags.cwd : process.cwd());
   const cmd = args._[0] ?? 'scan';
 
   if (cmd === 'rules') {
     const c = colors(shouldColor(process.stdout, typeof flags.color === 'boolean' ? flags.color : undefined));
-    for (const r of RULES) process.stdout.write(`${c.bold(r.id.padEnd(28))} ${r.severity.padEnd(7)} ${r.description}\n`);
+    for (const r of RULES)
+      process.stdout.write(`${c.bold(r.id.padEnd(28))} ${r.severity.padEnd(7)} ${r.description}\n`);
     return 0;
   }
 
@@ -129,7 +163,8 @@ async function main(argv: string[]): Promise<number> {
 
   if (cmd === 'install') {
     const target = args._[1] as InstallTarget;
-    if (!INSTALL_TARGETS.includes(target)) throw new UsageError(`install target must be one of: ${INSTALL_TARGETS.join(', ')}`);
+    if (!INSTALL_TARGETS.includes(target))
+      throw new UsageError(`install target must be one of: ${INSTALL_TARGETS.join(', ')}`);
     const plan = planInstall(target, {
       cwd,
       global: !!flags.global,
@@ -139,7 +174,10 @@ async function main(argv: string[]): Promise<number> {
     });
     process.stdout.write(renderPlan(plan, cwd) + '\n');
     if (plan.alreadyInstalled) return 0;
-    if (flags['dry-run']) { process.stdout.write('\n(dry run: nothing written)\n'); return 0; }
+    if (flags['dry-run']) {
+      process.stdout.write('\n(dry run: nothing written)\n');
+      return 0;
+    }
     let ok = !!flags.yes;
     if (!ok) {
       if (!process.stdin.isTTY) {
@@ -148,7 +186,10 @@ async function main(argv: string[]): Promise<number> {
       }
       ok = await confirm(`\nWrite ${plan.file}? [y/N] `);
     }
-    if (!ok) { process.stdout.write('Aborted; nothing written.\n'); return 1; }
+    if (!ok) {
+      process.stdout.write('Aborted; nothing written.\n');
+      return 1;
+    }
     applyPlan(plan);
     process.stdout.write(`\n✔ Wrote ${plan.file}\n`);
     for (const n of plan.notes) process.stdout.write(`  • ${n}\n`);
@@ -158,12 +199,18 @@ async function main(argv: string[]): Promise<number> {
   if (cmd !== 'scan') throw new UsageError(`Unknown command "${cmd}". Run fakegreen --help.`);
 
   const started = Date.now();
-  let root = cwd;
+  let root: string;
   let description: string;
   let diffs;
   const fromDiff = typeof flags.diff === 'string' ? flags.diff : undefined;
   if (!fromDiff) root = repoRoot(cwd);
-  else { try { root = repoRoot(cwd); } catch { root = cwd; } }
+  else {
+    try {
+      root = repoRoot(cwd);
+    } catch {
+      root = cwd;
+    }
+  }
   const config = loadConfig(root, typeof flags.config === 'string' ? flags.config : undefined);
   if (fromDiff) {
     const text = fromDiff === '-' ? readStdin() : fs.readFileSync(path.resolve(cwd, fromDiff), 'utf8');
@@ -184,12 +231,18 @@ async function main(argv: string[]): Promise<number> {
   if (flags.sarif) format = 'sarif';
   const elapsedMs = Date.now() - started;
   switch (format) {
-    case 'json': process.stdout.write(renderJson(shown, result.stats, description, failed) + '\n'); break;
-    case 'sarif': process.stdout.write(renderSarif(shown) + '\n'); break;
+    case 'json':
+      process.stdout.write(renderJson(shown, result.stats, description, failed) + '\n');
+      break;
+    case 'sarif':
+      process.stdout.write(renderSarif(shown) + '\n');
+      break;
     case 'github': {
       const ann = renderGithub(shown);
       if (ann) process.stdout.write(ann + '\n');
-      process.stdout.write(renderPretty(shown, result.stats, { c: colors(false), description, failOn, failed, elapsedMs }) + '\n');
+      process.stdout.write(
+        renderPretty(shown, result.stats, { c: colors(false), description, failOn, failed, elapsedMs }) + '\n',
+      );
       break;
     }
     case 'pretty': {
@@ -197,7 +250,8 @@ async function main(argv: string[]): Promise<number> {
       process.stdout.write(renderPretty(shown, result.stats, { c, description, failOn, failed, elapsedMs }) + '\n');
       break;
     }
-    default: throw new UsageError(`Unknown --format ${format}`);
+    default:
+      throw new UsageError(`Unknown --format ${format}`);
   }
   return failed ? 1 : 0;
 }
@@ -209,10 +263,16 @@ if (require.main === module) {
     throw e;
   });
   main(process.argv.slice(2)).then(
-    (code) => { process.exitCode = code; },
+    (code) => {
+      process.exitCode = code;
+    },
     (e: Error) => {
-      const known = e instanceof UsageError || e instanceof GitError || e instanceof ConfigError || (e as NodeJS.ErrnoException).code === 'ENOENT';
-      process.stderr.write(`fakegreen: ${known ? e.message : e.stack ?? e.message}\n`);
+      const known =
+        e instanceof UsageError ||
+        e instanceof GitError ||
+        e instanceof ConfigError ||
+        (e as NodeJS.ErrnoException).code === 'ENOENT';
+      process.stderr.write(`fakegreen: ${known ? e.message : (e.stack ?? e.message)}\n`);
       process.exitCode = 2;
     },
   );

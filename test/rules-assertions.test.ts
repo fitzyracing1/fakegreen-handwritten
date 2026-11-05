@@ -15,7 +15,14 @@ const T = lines(
 
 describe('assertion-weakened', () => {
   test('toBe -> toBeTruthy / toEqual -> toBeDefined', () => {
-    const f = scanEdit('src/user.test.ts', T, T.replace("expect(u.name).toBe('Ada');", 'expect(u.name).toBeTruthy();').replace('expect(u.age).toEqual(36);', 'expect(u.age).toBeDefined();'));
+    const f = scanEdit(
+      'src/user.test.ts',
+      T,
+      T.replace("expect(u.name).toBe('Ada');", 'expect(u.name).toBeTruthy();').replace(
+        'expect(u.age).toEqual(36);',
+        'expect(u.age).toBeDefined();',
+      ),
+    );
     const w = only(f, 'assertion-weakened');
     assert.equal(w.length, 2);
     assert.equal(w[0].severity, 'high');
@@ -30,17 +37,36 @@ describe('assertion-weakened', () => {
 
   test('python assertEqual -> assertIsNotNone', () => {
     const a = 'class T(unittest.TestCase):\n    def test_u(self):\n        self.assertEqual(load(1).name, "Ada")\n';
-    const f = scanEdit('tests/test_u.py', a, a.replace('self.assertEqual(load(1).name, "Ada")', 'self.assertIsNotNone(load(1))'));
+    const f = scanEdit(
+      'tests/test_u.py',
+      a,
+      a.replace('self.assertEqual(load(1).name, "Ada")', 'self.assertIsNotNone(load(1))'),
+    );
     assert.deepEqual(ids(f), ['assertion-weakened']);
   });
 
   test('java assertEquals -> assertNotNull, go assert.Equal -> assert.NotNil, rust assert_eq! -> assert!', () => {
     const j = 'class UTest {\n  @Test\n  void u() {\n    assertEquals("Ada", load(1).name);\n  }\n}\n';
-    assert.deepEqual(ids(scanEdit('src/test/java/UTest.java', j, j.replace('assertEquals("Ada", load(1).name);', 'assertNotNull(load(1));'))), ['assertion-weakened']);
+    assert.deepEqual(
+      ids(
+        scanEdit(
+          'src/test/java/UTest.java',
+          j,
+          j.replace('assertEquals("Ada", load(1).name);', 'assertNotNull(load(1));'),
+        ),
+      ),
+      ['assertion-weakened'],
+    );
     const g = 'package u\nfunc TestU(t *testing.T) {\n\tassert.Equal(t, "Ada", Load(1).Name)\n}\n';
-    assert.deepEqual(ids(scanEdit('u/u_test.go', g, g.replace('assert.Equal(t, "Ada", Load(1).Name)', 'assert.NotNil(t, Load(1))'))), ['assertion-weakened']);
+    assert.deepEqual(
+      ids(scanEdit('u/u_test.go', g, g.replace('assert.Equal(t, "Ada", Load(1).Name)', 'assert.NotNil(t, Load(1))'))),
+      ['assertion-weakened'],
+    );
     const r = '#[test]\nfn u() {\n    assert_eq!(load(1).name, "Ada");\n}\n';
-    assert.deepEqual(ids(scanEdit('tests/u.rs', r, r.replace('assert_eq!(load(1).name, "Ada");', 'assert!(load(1).is_ok());'))), ['assertion-weakened']);
+    assert.deepEqual(
+      ids(scanEdit('tests/u.rs', r, r.replace('assert_eq!(load(1).name, "Ada");', 'assert!(load(1).is_ok());'))),
+      ['assertion-weakened'],
+    );
   });
 
   test('idiomatic python rewrites are not weakening', () => {
@@ -54,13 +80,28 @@ describe('assertion-weakened', () => {
   });
 
   test('restructured go test (Equal -> NoError on a different call) is not weakening', () => {
-    const g = 'package u\nfunc TestU(t *testing.T) {\n\tinfo, _ := os.Stat(dst)\n\tassert.Equal(t, info.Mode().Perm(), mode)\n}\n';
-    const f = scanEdit('u/u_test.go', g, g.replace('\tinfo, _ := os.Stat(dst)\n\tassert.Equal(t, info.Mode().Perm(), mode)', '\trequire.NoError(t, c.Save(f, dst, mode))'));
+    const g =
+      'package u\nfunc TestU(t *testing.T) {\n\tinfo, _ := os.Stat(dst)\n\tassert.Equal(t, info.Mode().Perm(), mode)\n}\n';
+    const f = scanEdit(
+      'u/u_test.go',
+      g,
+      g.replace(
+        '\tinfo, _ := os.Stat(dst)\n\tassert.Equal(t, info.Mode().Perm(), mode)',
+        '\trequire.NoError(t, c.Save(f, dst, mode))',
+      ),
+    );
     assert.deepEqual(only(f, 'assertion-weakened'), []);
   });
 
   test('unrelated subjects are not paired', () => {
-    const f = scanEdit('src/user.test.ts', T, T.replace("expect(u.name).toBe('Ada');", "expect(u.name).toBe('Ada');\n    expect(u.id).toBeDefined();").replace('    expect(u.tags).toHaveLength(2);\n', ''));
+    const f = scanEdit(
+      'src/user.test.ts',
+      T,
+      T.replace("expect(u.name).toBe('Ada');", "expect(u.name).toBe('Ada');\n    expect(u.id).toBeDefined();").replace(
+        '    expect(u.tags).toHaveLength(2);\n',
+        '',
+      ),
+    );
     assert.deepEqual(only(f, 'assertion-weakened'), []);
   });
 });
@@ -75,19 +116,27 @@ describe('assertion-removed', () => {
   });
 
   test('removing three or more assertions is high', () => {
-    const f = scanEdit('src/user.test.ts', T, T.replace(/    expect\(.*\n/g, ''));
+    const f = scanEdit('src/user.test.ts', T, T.replace(/ {4}expect\(.*\n/g, ''));
     assert.equal(only(f, 'assertion-removed')[0].severity, 'high');
   });
 
   test('commented-out assertions are high and labelled', () => {
-    const f = scanEdit('src/user.test.ts', T, T.replace("    expect(u.name).toBe('Ada');", "    // expect(u.name).toBe('Ada');"));
+    const f = scanEdit(
+      'src/user.test.ts',
+      T,
+      T.replace("    expect(u.name).toBe('Ada');", "    // expect(u.name).toBe('Ada');"),
+    );
     const r = only(f, 'assertion-removed');
     assert.equal(r[0].severity, 'high');
     assert.match(r[0].message, /commented out/);
   });
 
   test('rewriting an assertion (same count) is not a removal', () => {
-    const f = scanEdit('src/user.test.ts', T, T.replace("expect(u.name).toBe('Ada');", "expect(u.name).toStrictEqual('Ada');"));
+    const f = scanEdit(
+      'src/user.test.ts',
+      T,
+      T.replace("expect(u.name).toBe('Ada');", "expect(u.name).toStrictEqual('Ada');"),
+    );
     assert.deepEqual(only(f, 'assertion-removed'), []);
   });
 
@@ -103,7 +152,11 @@ describe('assertion-trivial', () => {
       ['src/a.test.ts', T, T.replace("expect(u.name).toBe('Ada');", 'expect(true).toBe(true);')],
       ['tests/test_a.py', 'def test_a():\n    assert f() == 1\n', 'def test_a():\n    assert True\n'],
       ['tests/a.rs', '#[test]\nfn a() {\n    assert_eq!(f(), 1);\n}\n', '#[test]\nfn a() {\n    assert!(true);\n}\n'],
-      ['src/test/java/ATest.java', 'class ATest {\n  @Test void a() {\n    assertEquals(1, f());\n  }\n}\n', 'class ATest {\n  @Test void a() {\n    assertTrue(true);\n  }\n}\n'],
+      [
+        'src/test/java/ATest.java',
+        'class ATest {\n  @Test void a() {\n    assertEquals(1, f());\n  }\n}\n',
+        'class ATest {\n  @Test void a() {\n    assertTrue(true);\n  }\n}\n',
+      ],
     ];
     for (const [file, a, b] of cases) {
       assert.ok(ids(scanEdit(file, a, b)).includes('assertion-trivial'), file);
@@ -111,12 +164,23 @@ describe('assertion-trivial', () => {
   });
 
   test('a trivial assertion inside a string literal is not flagged', () => {
-    const f = scanEdit('src/a.test.ts', T, T.replace("expect(u.name).toBe('Ada');", "expect(u.name).toBe('Ada');\n    const code = 'expect(true).toBe(true);';"));
+    const f = scanEdit(
+      'src/a.test.ts',
+      T,
+      T.replace(
+        "expect(u.name).toBe('Ada');",
+        "expect(u.name).toBe('Ada');\n    const code = 'expect(true).toBe(true);';",
+      ),
+    );
     assert.deepEqual(only(f, 'assertion-trivial'), []);
   });
 
   test('expect(result).toBe(true) is not trivial', () => {
-    const f = scanEdit('src/a.test.ts', T, T.replace("expect(u.name).toBe('Ada');", "expect(u.name === 'Ada').toBe(true);"));
+    const f = scanEdit(
+      'src/a.test.ts',
+      T,
+      T.replace("expect(u.name).toBe('Ada');", "expect(u.name === 'Ada').toBe(true);"),
+    );
     assert.deepEqual(only(f, 'assertion-trivial'), []);
   });
 });

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { parseArgs } from '../src/cli';
@@ -8,7 +9,12 @@ import { sh, tmpRepo, writeFiles } from './helpers';
 
 const CLI = path.join(__dirname, '..', '..', 'dist', 'cli.js');
 const run = (cwd: string, args: string[], input?: string) =>
-  spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: 'utf8', input, env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '' } });
+  spawnSync(process.execPath, [CLI, ...args], {
+    cwd,
+    encoding: 'utf8',
+    input,
+    env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '' },
+  });
 
 const T = "it('a', () => {\n  expect(f()).toBe(1);\n});\n";
 
@@ -89,14 +95,15 @@ describe('cli', () => {
   });
 
   test('--diff reads a patch from stdin', () => {
-    const patch = 'diff --git a/x.test.js b/x.test.js\n--- a/x.test.js\n+++ b/x.test.js\n@@ -1 +1 @@\n-it("a", f)\n+it.skip("a", f)\n';
+    const patch =
+      'diff --git a/x.test.js b/x.test.js\n--- a/x.test.js\n+++ b/x.test.js\n@@ -1 +1 @@\n-it("a", f)\n+it.skip("a", f)\n';
     const r = run(dir, ['--diff', '-', '--json'], patch);
     assert.equal(r.status, 1);
     assert.equal(JSON.parse(r.stdout).findings[0].ruleId, 'test-skipped');
   });
 
   test('errors exit 2', () => {
-    const notRepo = fs.mkdtempSync(path.join(require('os').tmpdir(), 'fg-norepo-'));
+    const notRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'fg-norepo-'));
     const r = run(notRepo, []);
     assert.equal(r.status, 2);
     assert.match(r.stderr, /Not a git repository/);

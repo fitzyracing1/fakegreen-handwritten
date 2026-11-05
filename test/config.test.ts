@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { describe, test } from 'node:test';
 import { loadConfig, resolveConfig } from '../src/config';
 import { globToRegExp } from '../src/glob';
@@ -17,8 +16,15 @@ describe('config', () => {
   });
 
   test('ignore globs skip paths', () => {
-    const f = scanChange({ 'legacy/a.test.ts': T, 'src/a.test.ts': T }, { 'legacy/a.test.ts': null, 'src/a.test.ts': null }, { config: { ignore: ['legacy/**'] } });
-    assert.deepEqual(f.map((x) => x.file), ['src/a.test.ts']);
+    const f = scanChange(
+      { 'legacy/a.test.ts': T, 'src/a.test.ts': T },
+      { 'legacy/a.test.ts': null, 'src/a.test.ts': null },
+      { config: { ignore: ['legacy/**'] } },
+    );
+    assert.deepEqual(
+      f.map((x) => x.file),
+      ['src/a.test.ts'],
+    );
   });
 
   test('testPatterns marks extra test files', () => {
@@ -33,7 +39,9 @@ describe('config', () => {
   });
 
   test('loads .fakegreenrc.json and package.json#fakegreen', () => {
-    const dir = tmpRepo({ '.fakegreenrc.json': JSON.stringify({ failOn: 'medium', rules: { 'error-swallowed': 'off' } }) });
+    const dir = tmpRepo({
+      '.fakegreenrc.json': JSON.stringify({ failOn: 'medium', rules: { 'error-swallowed': 'off' } }),
+    });
     const c = loadConfig(dir);
     assert.equal(c.failOn, 'medium');
     assert.equal(c.rules['error-swallowed'], 'off');
@@ -56,7 +64,10 @@ describe('config', () => {
 
 describe('inline fakegreen-ignore', () => {
   test('on the line above, scoped to a rule', () => {
-    const after = T.replace("it('a'", "// fakegreen-ignore test-skipped -- upstream API down, tracked in #12\nit.skip('a'");
+    const after = T.replace(
+      "it('a'",
+      "// fakegreen-ignore test-skipped -- upstream API down, tracked in #12\nit.skip('a'",
+    );
     assert.deepEqual(ids(scanEdit('src/a.test.ts', T, after)), ['ignore-comment-added']);
   });
 
